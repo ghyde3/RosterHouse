@@ -1,7 +1,7 @@
 // Read-model helpers for the request loops (time off, swaps, claims).
 // Server components call these directly; API routes wrap them.
 import { prisma } from "@/lib/db";
-import { formatDateRange } from "@/lib/time";
+import { formatDateRange, formatMediumDate, formatShiftRange } from "@/lib/time";
 import { subDays } from "date-fns";
 import type { RequestStatus, TimeOffReason } from "@/generated/prisma/client";
 
@@ -111,4 +111,44 @@ export async function listQualifiedCoworkers(
     orderBy: { user: { name: "asc" } },
   });
   return rows.map((r) => ({ profileId: r.id, name: r.user.name }));
+}
+
+export type OpenShiftItem = {
+  shiftId: string;
+  date: string;
+  dayLabel: string;
+  positionName: string;
+  timeLabel: string;
+  qualified: boolean;
+  myClaimStatus: RequestStatus | null;
+};
+
+export async function listOpenShiftsForEmployee(employeeProfileId: string): Promise<OpenShiftItem[]> {
+  const profile = await prisma.employeeProfile.findUniqueOrThrow({
+    where: { id: employeeProfileId },
+    include: { location: true, positions: true },
+  });
+  const shifts = await prisma.shift.findMany({
+    where: {
+      locationId: profile.locationId,
+      employeeProfileId: null,
+      status: "published",
+      startsAt: { gt: new Date() },
+    },
+    include: { position: true, claims: { where: { employeeProfileId } } },
+    orderBy: { startsAt: "asc" },
+  });
+  const qualifiedIds = new Set(profile.positions.map((p) => p.positionId));
+  return shifts.map((s) => {
+    const date = isoDateOf(s.date);
+    return {
+      shiftId: s.id,
+      date,
+      dayLabel: formatMediumDate(date),
+      positionName: s.position.name,
+      timeLabel: formatShiftRange(s.startsAt, s.endsAt, profile.location.timezone),
+      qualified: qualifiedIds.has(s.positionId),
+      myClaimStatus: s.claims[0]?.status ?? null,
+    };
+  });
 }
