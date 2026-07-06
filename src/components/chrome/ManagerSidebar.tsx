@@ -39,7 +39,7 @@ export function ManagerSidebar({ locationName, userName }: ManagerSidebarProps) 
         {NAV.map((item) => {
           const active = item.exact
             ? pathname === item.href
-            : pathname.startsWith(item.href);
+            : pathname === item.href || pathname.startsWith(`${item.href}/`);
           return (
             <Link
               key={item.href}

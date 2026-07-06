@@ -40,6 +40,14 @@ describe("ManagerSidebar", () => {
     ).not.toHaveAttribute("aria-current");
   });
 
+  it("does not activate sibling routes due to prefix match", () => {
+    pathnameMock.mockReturnValue("/manager/teams");
+    render(<ManagerSidebar locationName="Downtown" userName="Jamie Park" />);
+    expect(screen.getByRole("link", { name: "Team" })).not.toHaveAttribute(
+      "aria-current"
+    );
+  });
+
   it("shows location, user name, and user initials", () => {
     pathnameMock.mockReturnValue("/manager");
     render(<ManagerSidebar locationName="Downtown" userName="Jamie Park" />);
