@@ -69,6 +69,7 @@ Railway deploy is verified at the end of each phase (config exists:
 ### Route map
 
 ```
+/                       public marketing landing page (BUILT — src/app/page.tsx)
 /login  /signup  /invite/[token]  /forgot-password          (auth pages)
 /manager                → dashboard
 /manager/schedule       ?week=YYYY-MM-DD&view=week|day|month
@@ -76,7 +77,7 @@ Railway deploy is verified at the end of each phase (config exists:
 /manager/availability
 /manager/time-off
 /manager/swaps
-/(employee)/home        → "/" for employees
+/(employee)/shifts      → "/shifts" — employee home ("My shifts")
 /(employee)/shifts/[shiftId]
 /(employee)/availability
 /(employee)/clock
@@ -85,8 +86,12 @@ Railway deploy is verified at the end of each phase (config exists:
 /(employee)/profile
 ```
 
-Middleware: unauthenticated → `/login`; employees hitting `/manager/*` →
-`/`; managers hitting employee tabs → `/manager`.
+Middleware: `/` is public (marketing) — authenticated users hitting `/`
+redirect by role (manager → `/manager`, employee → `/shifts`);
+unauthenticated users hitting app routes → `/login`; employees hitting
+`/manager/*` → `/shifts`; managers hitting employee tabs → `/manager`.
+The employee home lives at `/shifts` so the marketing page can own `/`
+(a root `page.tsx` and `(employee)/page.tsx` cannot both resolve `/`).
 
 ### `src/lib/time.ts` (Phase 3 implements; 3/4/5 consume)
 
@@ -139,7 +144,7 @@ Approved time off renders as `outside_availability` with message
 export const { handlers, auth, signIn, signOut }: NextAuthResult;
 // JWT session; session.user: { id, name, role: 'manager'|'employee', organizationId }
 requireUser(): Promise<SessionUser>;      // redirect('/login') if absent
-requireManager(): Promise<SessionUser>;   // + redirect('/') if employee
+requireManager(): Promise<SessionUser>;   // + redirect('/shifts') if employee
 // authz.ts
 getManagerLocation(userId: string): Promise<Location>;   // v1: sole location
 getEmployeeProfile(userId: string): Promise<EmployeeProfile & { location: Location; primaryPosition: Position | null }>;

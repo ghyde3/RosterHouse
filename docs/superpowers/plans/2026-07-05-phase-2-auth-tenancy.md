@@ -62,7 +62,7 @@ Spinner: { size?: number }
 //  Availability /manager/availability, Time off /manager/time-off, Swaps /manager/swaps)
 ManagerSidebar: { locationName: string; userName: string }   // userName feeds the initials avatar chip
 // @/components/chrome/EmployeeTabBar — fixed bottom tab bar; renders its own links
-// (Shifts /, Availability /availability, Clock /clock, Open shifts /swaps, Profile /profile)
+// (Shifts /shifts, Availability /availability, Clock /clock, Open shifts /swaps, Profile /profile)
 EmployeeTabBar: { className?: string }     // no required props
 ```
 
@@ -79,7 +79,7 @@ src/app/api/auth/[...nextauth]/route.ts                                     (Tas
 src/lib/routes.ts                  pure redirect rules                      (Task 5)
 src/middleware.ts                  auth middleware                          (Task 5)
 src/app/manager/layout.tsx + page.tsx        manager shell + placeholder    (Task 5)
-src/app/(employee)/layout.tsx + page.tsx     employee shell + placeholder   (Task 5)
+src/app/(employee)/layout.tsx + shifts/page.tsx   employee shell + placeholder (Task 5)
 prisma/seed.ts + prisma.config.ts changes    Harbor & Vine demo data        (Task 6)
 src/app/login/*  src/app/forgot-password/*                                  (Task 7)
 src/app/signup/* + src/app/api/auth/signup/route.ts                         (Task 8)
@@ -694,7 +694,7 @@ git commit -m "feat: add tenancy helpers and credential authentication to authz"
   - `session.user: { id: string; name: string; role: "manager"|"employee"; organizationId: string }` (plus default email/name fields).
   - `type SessionUser = { id: string; name: string; role: "manager"|"employee"; organizationId: string }` from `@/lib/auth`.
   - `requireUser(): Promise<SessionUser>` — for pages/layouts; `redirect("/login")` when unauthenticated.
-  - `requireManager(): Promise<SessionUser>` — additionally `redirect("/")` for employees.
+  - `requireManager(): Promise<SessionUser>` — additionally `redirect("/shifts")` for employees.
   - `apiUser(): Promise<SessionUser | null>` — NEW contract (not in roadmap): non-redirecting session read for API route handlers; handlers return a 401 envelope when it is null.
   - `authConfig` from `@/lib/auth.config` — edge-safe config (no Prisma/bcrypt imports) that `src/middleware.ts` (Task 5) consumes.
   - Credentials field names are exactly `identifier` and `password` (the login/signup/invite pages call `signIn("credentials", { identifier, password, redirect: false })`).
@@ -878,10 +878,10 @@ export async function requireUser(): Promise<SessionUser> {
   return { id, name: name ?? "", role, organizationId };
 }
 
-/** For manager pages: employees are sent to their home ("/"). */
+/** For manager pages: employees are sent to their home ("/shifts"). */
 export async function requireManager(): Promise<SessionUser> {
   const user = await requireUser();
-  if (user.role !== "manager") redirect("/");
+  if (user.role !== "manager") redirect("/shifts");
   return user;
 }
 
@@ -940,9 +940,10 @@ git commit -m "feat: add Auth.js v5 credentials auth with JWT sessions and sessi
 - Create: `src/app/manager/layout.tsx`
 - Create: `src/app/manager/page.tsx` (placeholder dashboard; Phase 3 replaces it)
 - Create: `src/app/(employee)/layout.tsx`
-- Create: `src/app/(employee)/page.tsx` (placeholder home; Phase 4 replaces it)
-- Delete: `src/app/page.tsx` (the scaffold splash — it would collide with `(employee)/page.tsx` on `/`)
+- Create: `src/app/(employee)/shifts/page.tsx` (placeholder home; Phase 4 replaces it)
 - Test: `src/lib/__tests__/routes.test.ts`
+
+Do **not** touch `src/app/page.tsx` — it is the public marketing landing page, already built and committed. The employee home lives at `/shifts` so the marketing page can own `/`.
 
 **Interfaces:**
 - Consumes: `authConfig` (Task 4), `requireUser`/`requireManager` (Task 4), `getManagerLocation` (Task 3), `ManagerSidebar`/`EmployeeTabBar`/`ToasterProvider` (Phase 1 — see "Consumed component contract").
@@ -950,7 +951,7 @@ git commit -m "feat: add Auth.js v5 credentials auth with JWT sessions and sessi
   - `redirectTargetFor(pathname: string, user: { role: "manager"|"employee" } | null): string | null` in `@/lib/routes` — pure redirect-rule function (also exports `isPublicPath`, `isEmployeePath`).
   - `src/app/manager/layout.tsx` — Phases 3+ add pages under it; it provides `requireManager()` + sidebar + `<main>` with `var(--space-8)` padding, all wrapped in `<ToasterProvider>` (so `useToast()` works on every `/manager/*` page).
   - `src/app/(employee)/layout.tsx` — Phase 4 adds pages under it; it provides `requireUser()` + bottom tab bar, content max width 480px, all wrapped in `<ToasterProvider>` (so `useToast()` works on every employee page).
-  - Redirect behavior (roadmap contract): unauthenticated → `/login`; employee at `/manager/*` → `/`; manager at employee tabs (`/`, `/shifts/*`, `/availability`, `/clock`, `/swaps`, `/notifications`, `/profile`) → `/manager`; signed-in users at `/login` or `/signup` → their home.
+  - Redirect behavior (roadmap contract): `/` is public (marketing landing page); authenticated users hitting `/` redirect by role (manager → `/manager`, employee → `/shifts`); unauthenticated users hitting app routes → `/login`; employee at `/manager/*` → `/shifts`; manager at employee tabs (`/shifts`, `/shifts/*`, `/availability`, `/clock`, `/swaps`, `/notifications`, `/profile`) → `/manager`; signed-in users at `/login` or `/signup` → their home.
 
 - [ ] **Step 1: Write the failing test for the redirect rules**
 
@@ -964,7 +965,8 @@ const manager = { role: "manager" as const };
 const employee = { role: "employee" as const };
 
 describe("isPublicPath", () => {
-  it("allows auth pages and invite links", () => {
+  it("allows the marketing page, auth pages, and invite links", () => {
+    expect(isPublicPath("/")).toBe(true);
     expect(isPublicPath("/login")).toBe(true);
     expect(isPublicPath("/signup")).toBe(true);
     expect(isPublicPath("/forgot-password")).toBe(true);
@@ -973,7 +975,7 @@ describe("isPublicPath", () => {
   });
 
   it("does not allow app pages", () => {
-    expect(isPublicPath("/")).toBe(false);
+    expect(isPublicPath("/shifts")).toBe(false);
     expect(isPublicPath("/manager")).toBe(false);
     expect(isPublicPath("/manager/team")).toBe(false);
   });
@@ -981,7 +983,7 @@ describe("isPublicPath", () => {
 
 describe("isEmployeePath", () => {
   it("matches the employee tab routes", () => {
-    expect(isEmployeePath("/")).toBe(true);
+    expect(isEmployeePath("/shifts")).toBe(true);
     expect(isEmployeePath("/shifts/abc")).toBe(true);
     expect(isEmployeePath("/availability")).toBe(true);
     expect(isEmployeePath("/clock")).toBe(true);
@@ -990,7 +992,8 @@ describe("isEmployeePath", () => {
     expect(isEmployeePath("/profile")).toBe(true);
   });
 
-  it("does not match manager routes, even overlapping names", () => {
+  it("does not match the marketing page or manager routes, even overlapping names", () => {
+    expect(isEmployeePath("/")).toBe(false);
     expect(isEmployeePath("/manager")).toBe(false);
     expect(isEmployeePath("/manager/availability")).toBe(false);
     expect(isEmployeePath("/manager/swaps")).toBe(false);
@@ -1000,18 +1003,24 @@ describe("isEmployeePath", () => {
 describe("redirectTargetFor", () => {
   it("sends unauthenticated users to /login except on public paths", () => {
     expect(redirectTargetFor("/manager", null)).toBe("/login");
-    expect(redirectTargetFor("/", null)).toBe("/login");
+    expect(redirectTargetFor("/shifts", null)).toBe("/login");
+    expect(redirectTargetFor("/", null)).toBeNull();
     expect(redirectTargetFor("/login", null)).toBeNull();
     expect(redirectTargetFor("/invite/tok", null)).toBeNull();
   });
 
-  it("sends employees at /manager/* to /", () => {
-    expect(redirectTargetFor("/manager", employee)).toBe("/");
-    expect(redirectTargetFor("/manager/schedule", employee)).toBe("/");
+  it("redirects signed-in users from the marketing page to their home", () => {
+    expect(redirectTargetFor("/", manager)).toBe("/manager");
+    expect(redirectTargetFor("/", employee)).toBe("/shifts");
+  });
+
+  it("sends employees at /manager/* to /shifts", () => {
+    expect(redirectTargetFor("/manager", employee)).toBe("/shifts");
+    expect(redirectTargetFor("/manager/schedule", employee)).toBe("/shifts");
   });
 
   it("sends managers at employee tabs to /manager", () => {
-    expect(redirectTargetFor("/", manager)).toBe("/manager");
+    expect(redirectTargetFor("/shifts", manager)).toBe("/manager");
     expect(redirectTargetFor("/clock", manager)).toBe("/manager");
     expect(redirectTargetFor("/shifts/abc", manager)).toBe("/manager");
   });
@@ -1020,12 +1029,12 @@ describe("redirectTargetFor", () => {
     expect(redirectTargetFor("/manager/team", manager)).toBeNull();
     expect(redirectTargetFor("/manager/availability", manager)).toBeNull();
     expect(redirectTargetFor("/availability", employee)).toBeNull();
-    expect(redirectTargetFor("/", employee)).toBeNull();
+    expect(redirectTargetFor("/shifts", employee)).toBeNull();
   });
 
   it("bounces signed-in users off /login and /signup to their home", () => {
     expect(redirectTargetFor("/login", manager)).toBe("/manager");
-    expect(redirectTargetFor("/login", employee)).toBe("/");
+    expect(redirectTargetFor("/login", employee)).toBe("/shifts");
     expect(redirectTargetFor("/signup", manager)).toBe("/manager");
   });
 });
@@ -1051,12 +1060,12 @@ function matchesPrefix(pathname: string, prefix: string): boolean {
 }
 
 export function isPublicPath(pathname: string): boolean {
+  if (pathname === "/") return true; // public marketing landing page
   if (matchesPrefix(pathname, "/invite")) return true;
   return PUBLIC_PATHS.some((p) => matchesPrefix(pathname, p));
 }
 
 export function isEmployeePath(pathname: string): boolean {
-  if (pathname === "/") return true;
   return EMPLOYEE_PREFIXES.some((p) => matchesPrefix(pathname, p));
 }
 
@@ -1067,9 +1076,10 @@ export function isEmployeePath(pathname: string): boolean {
 export function redirectTargetFor(pathname: string, user: RouteUser | null): string | null {
   if (!user) return isPublicPath(pathname) ? null : "/login";
 
-  const home = user.role === "manager" ? "/manager" : "/";
-  if (pathname === "/login" || pathname === "/signup") return home;
-  if (user.role === "employee" && matchesPrefix(pathname, "/manager")) return "/";
+  const home = user.role === "manager" ? "/manager" : "/shifts";
+  // Signed-in users skip the marketing page and the auth pages.
+  if (pathname === "/" || pathname === "/login" || pathname === "/signup") return home;
+  if (user.role === "employee" && matchesPrefix(pathname, "/manager")) return "/shifts";
   if (user.role === "manager" && isEmployeePath(pathname)) return "/manager";
   return null;
 }
@@ -1078,7 +1088,7 @@ export function redirectTargetFor(pathname: string, user: RouteUser | null): str
 - [ ] **Step 4: Run the test to verify it passes**
 
 Run: `npx vitest run src/lib/__tests__/routes.test.ts`
-Expected: PASS (7 tests).
+Expected: PASS (10 tests).
 
 - [ ] **Step 5: Write the middleware**
 
@@ -1155,7 +1165,7 @@ export default async function ManagerDashboardPage() {
 }
 ```
 
-- [ ] **Step 7: Create the employee shell and placeholder home; remove the splash page**
+- [ ] **Step 7: Create the employee shell and placeholder home at /shifts**
 
 Create `src/app/(employee)/layout.tsx`:
 
@@ -1187,7 +1197,7 @@ export default async function EmployeeLayout({ children }: { children: React.Rea
 }
 ```
 
-Create `src/app/(employee)/page.tsx`:
+Create `src/app/(employee)/shifts/page.tsx`:
 
 ```tsx
 import { requireUser } from "@/lib/auth";
@@ -1211,11 +1221,7 @@ export default async function EmployeeHomePage() {
 }
 ```
 
-Delete the scaffold splash page (it would collide with the employee home on `/`):
-
-```bash
-rm src/app/page.tsx
-```
+Leave `src/app/page.tsx` alone — it is the public marketing landing page, and the employee home at `/shifts` no longer competes with it for `/`.
 
 - [ ] **Step 8: Confirm the toast provider mounts — no root-layout change**
 
@@ -1227,14 +1233,16 @@ Phase 1's `@/components/ui/Toaster` exports `ToasterProvider` and `useToast` —
 npm run dev &
 sleep 5
 curl -s -o /dev/null -w "%{http_code} -> %{redirect_url}\n" http://localhost:3000/manager
-curl -s -o /dev/null -w "%{http_code} -> %{redirect_url}\n" http://localhost:3000/
+curl -s -o /dev/null -w "%{http_code} -> %{redirect_url}\n" http://localhost:3000/shifts
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3000/
 curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3000/login
 kill %1
 ```
 
 Expected:
 - `/manager` → `30x -> http://localhost:3000/login`
-- `/` → `30x -> http://localhost:3000/login`
+- `/shifts` → `30x -> http://localhost:3000/login`
+- `/` → `200` (public marketing page, no redirect for guests)
 - `/login` → `200`
 
 - [ ] **Step 10: Run the type check and commit**
@@ -1242,11 +1250,9 @@ Expected:
 Run: `npx tsc --noEmit` — expected: no errors.
 
 ```bash
-git add -A src/lib/routes.ts src/middleware.ts src/app src/lib/__tests__/routes.test.ts
+git add src/lib/routes.ts src/middleware.ts src/app/manager "src/app/(employee)" src/lib/__tests__/routes.test.ts
 git commit -m "feat: add auth middleware, manager/employee shells, and placeholder pages"
 ```
-
-(`git add -A src/app` also stages the deletion of `src/app/page.tsx`.)
 
 ---
 
@@ -1670,7 +1676,7 @@ git commit -m "feat: add re-runnable Harbor & Vine seed dataset"
 - Test: `src/app/login/__tests__/login-form.test.tsx`
 
 **Interfaces:**
-- Consumes: `signIn` from `next-auth/react` (Task 4 wired the provider; credentials fields are `identifier` + `password`); `Button`, `Input`, `Card` primitives; seed users (Task 6) for manual verification; middleware role routing (Task 5) — after sign-in the form navigates to `/` and middleware forwards managers to `/manager`.
+- Consumes: `signIn` from `next-auth/react` (Task 4 wired the provider; credentials fields are `identifier` + `password`); `Button`, `Input`, `Card` primitives; seed users (Task 6) for manual verification; middleware role routing (Task 5) — after sign-in the form navigates to `/` and middleware forwards each role to its home (manager → `/manager`, employee → `/shifts`).
 - Produces: `/login` (shared by both roles) and `/forgot-password` (honest v1 stub — explains asking the manager for a reset link; no dead links). Design reference: `LoginScreen` in `"RosterHouse Design System/ui_kits/employee-mobile/EmployeeApp.jsx"` (brand wordmark, "Log in" heading, two inputs, full-width primary button) — but with a real form, real links, and a specific error state, fixing the export's onClick-div defects.
 
 - [ ] **Step 1: Write the failing component test**
@@ -1714,7 +1720,7 @@ describe("LoginForm", () => {
     expect(await screen.findByText("That phone/email or password doesn't match.")).toBeTruthy();
   });
 
-  it("navigates to / on success (middleware routes managers onward)", async () => {
+  it("navigates to / on success (middleware routes each role to its home)", async () => {
     signInMock.mockResolvedValue({ error: null, ok: true });
     render(<LoginForm />);
     fillAndSubmit("maria@harborvine.test", "rosterhouse1");
@@ -1770,8 +1776,9 @@ export function LoginForm() {
       setError("That phone/email or password doesn't match.");
       return;
     }
-    // Middleware routes managers from "/" to "/manager"; a full navigation
-    // makes sure the new session cookie is picked up.
+    // Middleware redirects signed-in users from "/" to their home (manager
+    // → "/manager", employee → "/shifts"); a full navigation makes sure the
+    // new session cookie is picked up.
     window.location.assign("/");
   }
 
@@ -1908,7 +1915,7 @@ npm run dev
 In a browser:
 1. Visit `http://localhost:3000/login`. Log in as `jamie@harborvine.test` / `rosterhouse1` → you land on `/manager` (dashboard placeholder with sidebar).
 2. Visit `http://localhost:3000/api/auth/signout`, confirm sign out (there is no in-app logout button until Phase 4's profile page — this built-in page is the way to switch users during QA).
-3. Log in as `maria@harborvine.test` / `rosterhouse1` → you land on `/` ("Hi, Maria" with the tab bar).
+3. Log in as `maria@harborvine.test` / `rosterhouse1` → you land on `/shifts` ("Hi, Maria" with the tab bar).
 4. Log in with a wrong password → the form shows "That phone/email or password doesn't match." and stays on `/login`.
 5. Click "Forgot password?" → the stub page renders with a working "Back to log in" link.
 
@@ -2939,7 +2946,7 @@ Design reference: `AcceptInviteScreen` in `"RosterHouse Design System/ui_kits/em
 
 **Interfaces:**
 - Consumes: `getInviteByToken`/`ResolvedInvite` (Task 9); `POST /api/invites/[token]/accept` (Task 9); `signIn` from `next-auth/react` (Task 4); `Button`/`Input` primitives; seed demo invite `demo-invite-riley` (Task 6) for manual QA.
-- Produces: public page `/invite/[token]` with four states (pending form / not found / used / expired). After a successful join it signs in with the phone number and hard-navigates to `/`.
+- Produces: public page `/invite/[token]` with four states (pending form / not found / used / expired). After a successful join it signs in with the phone number and hard-navigates to `/shifts` (the employee home).
 
 - [ ] **Step 1: Write the failing component test**
 
@@ -3081,7 +3088,7 @@ export function AcceptInviteForm({ token, inviterName, locationName, positionNam
       });
       return;
     }
-    window.location.assign("/");
+    window.location.assign("/shifts");
   }
 
   return (
@@ -3199,7 +3206,7 @@ Expected: PASS (3 tests).
 
 With `npm run dev` running and signed out:
 1. Visit `http://localhost:3000/invite/demo-invite-riley` → the form shows "Jamie Park invited you to join Downtown on RosterHouse as a server." with "Riley Quinn" prefilled.
-2. Join with phone `(555) 010-0112` and password `rosterhouse1` → you land on `/` as Riley.
+2. Join with phone `(555) 010-0112` and password `rosterhouse1` → you land on `/shifts` as Riley.
 3. Sign out, revisit the same URL → "This invite was already used".
 4. Visit `http://localhost:3000/invite/not-a-token` → "This invite link isn't valid".
 5. Re-run `npm run db:seed` to restore the demo invite.
@@ -4121,10 +4128,10 @@ Reset and walk the whole loop (or run the `/qa` skill against `npm run dev` with
 docker compose up -d && npm run db:seed && npm run dev
 ```
 
-1. Signed out: `/manager` → redirected to `/login`; `/` → `/login`; `/invite/demo-invite-riley` loads without a session.
-2. Log in as `jamie@harborvine.test` / `rosterhouse1` → `/manager`. Visiting `/` or `/clock` bounces back to `/manager`. `/login` bounces to `/manager`.
-3. Team flow: invite "Pat Doyle" (Server), copy the link, open it in a private window, join as Pat with a new phone + password → lands on `/` as Pat. In the private window, `/manager` bounces to `/`.
-4. Sign out (`/api/auth/signout`); log in as `maria@harborvine.test` → `/` shows "Hi, Maria"; `/manager/team` bounces to `/`.
+1. Signed out: `/` loads the public marketing page (no redirect); `/manager` → redirected to `/login`; `/shifts` → `/login`; `/invite/demo-invite-riley` loads without a session.
+2. Log in as `jamie@harborvine.test` / `rosterhouse1` → `/manager`. Visiting `/`, `/shifts`, or `/clock` bounces back to `/manager`. `/login` bounces to `/manager`.
+3. Team flow: invite "Pat Doyle" (Server), copy the link, open it in a private window, join as Pat with a new phone + password → lands on `/shifts` as Pat. In the private window, `/manager` bounces to `/shifts`.
+4. Sign out (`/api/auth/signout`); log in as `maria@harborvine.test` → `/shifts` shows "Hi, Maria"; `/manager/team` bounces to `/shifts`; visiting `/` bounces to `/shifts`.
 5. Signup: `/signup` end-to-end with a fresh email → lands on `/manager` for the new org; `/manager/team` shows the empty state.
 6. Wrong password at login → "That phone/email or password doesn't match." — no redirect, no console errors.
 7. `npm run db:seed` again → re-runs cleanly (restores Riley's demo invite; removes Pat, who belonged to the demo org).

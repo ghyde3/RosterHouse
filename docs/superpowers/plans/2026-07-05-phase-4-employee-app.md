@@ -46,9 +46,9 @@ You have zero context for this codebase. Here is everything cross-cutting:
   - `Spinner`: `{ size?: number; label?: string; className?: string }` (size in pixels, default 20; `role="status"`)
 - **Chrome** in `src/components/chrome/`:
   - `EmployeeTopBar`: `{ title: string; backHref?: string; action?: React.ReactNode; className?: string }` — renders the title as an `<h1>`, `backHref` as a chevron-left link, and `action` as a pinned right-side slot (this is where Phase 4's `PageTopBar` places the notification bell; the component has no bell props of its own).
-  - `EmployeeTabBar`: no required props (`className?` only); client component rendering five real `<Link>`s — `/` "Shifts" (icon `calendar`, also active on `/shifts/*`), `/availability` "Availability" (`calendar-check`), `/clock` "Clock" (`timer`), `/swaps` "Open shifts" (`repeat`), `/profile` "Profile" (`user`) — active tab via `usePathname()`. There is no "Home" tab: the employee home lives at `/`, reached via the Shifts tab.
+  - `EmployeeTabBar`: no required props (`className?` only); client component rendering five real `<Link>`s — `/shifts` "Shifts" (icon `calendar`, also active on `/shifts/*` detail pages), `/availability` "Availability" (`calendar-check`), `/clock` "Clock" (`timer`), `/swaps` "Open shifts" (`repeat`), `/profile` "Profile" (`user`) — active tab via `usePathname()`. There is no "Home" tab: the employee home lives at `/shifts`, reached via the Shifts tab (`/` is the public marketing landing page).
   - `DatePager`: `{ label: string; prevHref: string; nextHref: string; todayHref?: string }` — link-based week pager.
-- **Auth (Phase 2)** — `src/lib/auth.ts` exports `{ handlers, auth, signIn, signOut }` (Auth.js v5) plus `requireUser(): Promise<SessionUser>` (redirects to `/login` if absent) and `requireManager()`. `session.user` is `{ id, name, role: "manager"|"employee", organizationId }`. `src/lib/authz.ts` exports `getManagerLocation(userId): Promise<Location>` among others. **Middleware is already in place**: unauthenticated → `/login`; employees hitting `/manager/*` → `/`; managers hitting employee tabs → `/manager`. Do not add per-page role guards beyond what tasks specify.
+- **Auth (Phase 2)** — `src/lib/auth.ts` exports `{ handlers, auth, signIn, signOut }` (Auth.js v5) plus `requireUser(): Promise<SessionUser>` (redirects to `/login` if absent) and `requireManager()`. `session.user` is `{ id, name, role: "manager"|"employee", organizationId }`. `src/lib/authz.ts` exports `getManagerLocation(userId): Promise<Location>` among others. **Middleware is already in place**: `/` is public (marketing landing page); authenticated users hitting `/` redirect by role (manager → `/manager`, employee → `/shifts`); unauthenticated users hitting app routes → `/login`; employees hitting `/manager/*` → `/shifts`; managers hitting employee tabs → `/manager`. Do not add per-page role guards beyond what tasks specify.
 - **Time (Phase 3)** — `src/lib/time.ts`: `weekStartOf(d: Date, timezone: string): ISODate` (Monday), `addDaysISO(d: ISODate, n: number): ISODate`, `weekDatesOf(weekStart: ISODate): ISODate[]` (7 entries), `parseTime12h(input: string): { hour: number; minute: number } | null` (24-hour `hour`, e.g. "7:00 PM" → `{ hour: 19, minute: 0 }`; null = invalid), `formatTime(instant: Date, timezone: string): string` ("7:00 AM"), `formatShiftRange(startsAt: Date, endsAt: Date, timezone: string): string` ("7:00 AM – 3:00 PM"), `shiftDurationHours(startsAt: Date, endsAt: Date): number` (8, 7.5), `formatDurationHrs(hours: number): string` ("8 hrs"), `formatDayLabel(d: ISODate): string` ("Mon 6"). `ISODate` is a `string` like "2026-07-06".
 - **API envelope** — `src/lib/api.ts` exports `jsonOk(data, status?)` and `jsonErr(code, message, status?)` returning `NextResponse.json` of `{ ok: true, data }` / `{ ok: false, error: { code, message } }`. If Phase 2 did not create this file, create it exactly as:
 
@@ -98,7 +98,7 @@ export function jsonErr(code: string, message: string, status = 400) {
 - Create: `src/components/employee/PageTopBar.tsx`
 - Create: `src/components/employee/PageTopBar.module.css`
 - Create: `src/app/(employee)/error.tsx`
-- Replace (overwrite the Phase 2 placeholder): `src/app/(employee)/page.tsx` (home stub at `/` — replaced again in Task 3)
+- Replace (overwrite the Phase 2 placeholder): `src/app/(employee)/shifts/page.tsx` (home stub at `/shifts` — replaced again in Task 3)
 - Create: `src/app/(employee)/availability/page.tsx` (stub — replaced in Task 5)
 - Create: `src/app/(employee)/notifications/page.tsx` (stub — replaced in Task 7)
 - Create: `src/app/(employee)/profile/page.tsx` (stub — replaced in Task 8)
@@ -110,7 +110,7 @@ export function jsonErr(code: string, message: string, status = 400) {
 **Interfaces:**
 
 - Consumes: `EmployeeTabBar` (no required props) and `EmployeeTopBar` (`{ title, backHref?, action?, className? }`) from `src/components/chrome/` (Phase 1); `EmptyState` from `@/components/ui/EmptyState`; `Button` from `@/components/ui/Button`; `Icon` from `@/components/ui/Icon`; `auth()` from `@/lib/auth` (Phase 2); `prisma` from `@/lib/db`. Middleware (Phase 2) already redirects managers away from these routes — this task adds no role checks.
-- Produces: `PageTopBar` server component — `PageTopBar({ title: string; backHref?: string; showBell?: boolean })`, fetches the session user's unread notification count itself and renders the notification bell (a `/notifications` link with `aria-label="Notifications"` and an unread-count badge capped at "9+") into `EmployeeTopBar`'s `action` slot, with badge styles in `src/components/employee/PageTopBar.module.css`; CSS module classes in `src/components/employee/employee.module.css` used by Tasks 3–8: `.screen`, `.sectionTitle`, `.muted`, `.subtle`, `.cardRow`, `.cardStack`, `.dayLabel`, `.shiftTitle`, `.summaryCard`, `.summaryTitle`, `.summarySub`, `.linkReset`, `.linkBrand`, `.iconRow`, `.profileRow`, `.notifTitle`, `.notifTitleUnread`, `.notifMeta`, `.unreadDot`, `.errorWrap`, `.errorTitle`, `.skeleton`; stub pages at `/` (home), `/availability`, `/notifications`, `/profile` (replaced by Tasks 3/5/7/8) and lasting placeholder pages at `/clock` and `/swaps` (replaced in Phase 5); branded root-level `src/app/not-found.tsx` (unknown URLs anywhere, manager side included) and `src/app/global-error.tsx` (root-segment render failures).
+- Produces: `PageTopBar` server component — `PageTopBar({ title: string; backHref?: string; showBell?: boolean })`, fetches the session user's unread notification count itself and renders the notification bell (a `/notifications` link with `aria-label="Notifications"` and an unread-count badge capped at "9+") into `EmployeeTopBar`'s `action` slot, with badge styles in `src/components/employee/PageTopBar.module.css`; CSS module classes in `src/components/employee/employee.module.css` used by Tasks 3–8: `.screen`, `.sectionTitle`, `.muted`, `.subtle`, `.cardRow`, `.cardStack`, `.dayLabel`, `.shiftTitle`, `.summaryCard`, `.summaryTitle`, `.summarySub`, `.linkReset`, `.linkBrand`, `.iconRow`, `.profileRow`, `.notifTitle`, `.notifTitleUnread`, `.notifMeta`, `.unreadDot`, `.errorWrap`, `.errorTitle`, `.skeleton`; stub pages at `/shifts` (home), `/availability`, `/notifications`, `/profile` (replaced by Tasks 3/5/7/8) and lasting placeholder pages at `/clock` and `/swaps` (replaced in Phase 5); branded root-level `src/app/not-found.tsx` (unknown URLs anywhere, manager side included) and `src/app/global-error.tsx` (root-segment render failures).
 
 - [ ] **Step 1: Create the layout and its CSS module**
 
@@ -410,10 +410,10 @@ export default function EmployeeError({
 }
 ```
 
-- [ ] **Step 5: Create the six pages (four stubs + two Phase 5 placeholders; the home stub overwrites Phase 2's placeholder at `/`)**
+- [ ] **Step 5: Create the six pages (four stubs + two Phase 5 placeholders; the home stub overwrites Phase 2's placeholder at `/shifts`)**
 
 ```tsx
-// src/app/(employee)/page.tsx  (home stub at "/" — overwrites Phase 2's
+// src/app/(employee)/shifts/page.tsx  (home stub at "/shifts" — overwrites Phase 2's
 // placeholder; Task 3 replaces this file again with the real home screen)
 import { PageTopBar } from "@/components/employee/PageTopBar";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -454,7 +454,7 @@ import styles from "@/components/employee/employee.module.css";
 export default function NotificationsPage() {
   return (
     <div className={styles.screen}>
-      <PageTopBar title="Notifications" backHref="/" showBell={false} />
+      <PageTopBar title="Notifications" backHref="/shifts" showBell={false} />
       <EmptyState title="Notifications are coming soon" description="This screen is being built." />
     </div>
   );
@@ -522,6 +522,8 @@ Without these, unknown manager-side URLs and root-segment render failures fall b
 ```tsx
 // src/app/not-found.tsx — branded 404 for unknown URLs anywhere in the app
 // (manager side included). The (employee) group adds its own not-found in Task 4.
+// "Go to home" deliberately links to "/" — the public marketing landing page —
+// which is correct for guests; signed-in users hitting "/" are redirected by role.
 import Link from "next/link";
 import { EmptyState } from "@/components/ui/EmptyState";
 import styles from "@/components/employee/employee.module.css";
@@ -590,15 +592,15 @@ export default function GlobalError({
 - [ ] **Step 7: Verify it builds**
 
 Run: `npm run build`
-Expected: build completes with no type errors; the route list includes `/` (the employee home), `/availability`, `/clock`, `/swaps`, `/notifications`, `/profile`, and `/_not-found`.
+Expected: build completes with no type errors; the route list includes `/shifts` (the employee home), `/availability`, `/clock`, `/swaps`, `/notifications`, `/profile`, and `/_not-found`.
 
 - [ ] **Step 8: Manual check**
 
 Run: `docker compose up -d && npm run dev`, then in a browser:
-1. Log in as `maria@harborvine.test` / `rosterhouse1` → you land on the employee app.
-2. Tap each of the five tabs — each navigates to its page (stub copy is fine), the active tab is highlighted, and the URL changes (`/`, `/availability`, `/clock`, `/swaps`, `/profile`).
+1. Log in as `maria@harborvine.test` / `rosterhouse1` → you land on the employee app at `/shifts`.
+2. Tap each of the five tabs — each navigates to its page (stub copy is fine), the active tab is highlighted, and the URL changes (`/shifts`, `/availability`, `/clock`, `/swaps`, `/profile`).
 3. Tab stops: press Tab repeatedly — tab-bar items and the bell receive visible focus rings.
-4. Log in as `jamie@harborvine.test` in a private window and visit `/` → redirected to `/manager` (middleware from Phase 2; if this fails, stop and report — do not patch middleware in this task). Visit `/manager/nonexistent` → the branded root 404 shows with a working "Go to home" link.
+4. Log in as `jamie@harborvine.test` in a private window and visit `/shifts` → redirected to `/manager` (middleware from Phase 2; if this fails, stop and report — do not patch middleware in this task). Visit `/manager/nonexistent` → the branded root 404 shows with a working "Go to home" link.
 
 - [ ] **Step 9: Commit**
 
@@ -1362,8 +1364,8 @@ git commit -m "feat(api): /api/me and /api/me/shifts with employee query helpers
 **Files:**
 
 - Create: `src/components/employee/ShiftCard.tsx`
-- Replace (overwrite the Task 1 stub): `src/app/(employee)/page.tsx`
-- Create: `src/app/(employee)/loading.tsx`
+- Replace (overwrite the Task 1 stub): `src/app/(employee)/shifts/page.tsx`
+- Create: `src/app/(employee)/shifts/loading.tsx`
 
 **Interfaces:**
 
@@ -1419,7 +1421,7 @@ export function ShiftCard({
 Semantics: the summary card describes **this week** (Mon–Sun in the location timezone); the list shows shifts from this week and next whose `endsAt` is still in the future. Employees only ever see published shifts (`getMyShifts` already filters).
 
 ```tsx
-// src/app/(employee)/page.tsx — the employee home at "/"
+// src/app/(employee)/shifts/page.tsx — the employee home at "/shifts"
 import { requireUser } from "@/lib/auth";
 import { getEmployeeContext, getMyShifts } from "@/lib/queries/employee";
 import { addDaysISO, formatDurationHrs, weekStartOf } from "@/lib/time";
@@ -1491,7 +1493,7 @@ export default async function HomePage() {
 - [ ] **Step 3: Create the loading skeleton**
 
 ```tsx
-// src/app/(employee)/loading.tsx
+// src/app/(employee)/shifts/loading.tsx
 import styles from "@/components/employee/employee.module.css";
 
 export default function HomeLoading() {
@@ -1523,7 +1525,7 @@ Run: `npm run dev`, log in as `maria@harborvine.test` / `rosterhouse1`:
 - [ ] **Step 5: Commit**
 
 ```bash
-git add "src/app/(employee)/page.tsx" "src/app/(employee)/loading.tsx" src/components/employee/ShiftCard.tsx
+git add "src/app/(employee)/shifts/page.tsx" "src/app/(employee)/shifts/loading.tsx" src/components/employee/ShiftCard.tsx
 git commit -m "feat(employee): home screen with week summary, upcoming shifts, empty and loading states"
 ```
 
@@ -1884,7 +1886,7 @@ export default async function ShiftDetailPage({
 
   return (
     <div className={styles.screen}>
-      <PageTopBar title="Shift detail" backHref="/" />
+      <PageTopBar title="Shift detail" backHref="/shifts" />
 
       <Card>
         <div className={styles.dayLabel}>{shift.dayLabel}</div>
@@ -1985,7 +1987,7 @@ export default function EmployeeNotFound() {
         title="This page isn't available"
         description="It may have been removed, or you may not have access to it."
         action={
-          <Link href="/" className={styles.linkBrand}>
+          <Link href="/shifts" className={styles.linkBrand}>
             Go to home
           </Link>
         }
@@ -2834,7 +2836,7 @@ Run: `npm run dev`, as Maria on `/availability`:
 3. "Weekdays only" preset flips switches, keeps hour windows.
 4. Advanced tab: set Tue 10:00 AM / 4:00 PM → Save → toast "Availability saved", button disables. Reload — values persist.
 5. Enter "soonish" as a time → Save → inline error "Enter times like 9:00 AM.", nothing saved.
-6. Make a change, then tap the Shifts tab → bottom sheet "Discard unsaved changes?"; "Keep editing" stays; "Discard changes" navigates home (`/`).
+6. Make a change, then tap the Shifts tab → bottom sheet "Discard unsaved changes?"; "Keep editing" stays; "Discard changes" navigates home (`/shifts`).
 7. Make a change and hit browser reload → native leave-page warning appears.
 
 - [ ] **Step 12: Commit**
@@ -3447,7 +3449,7 @@ git commit -m "feat(manager): availability overview with hour windows, all emplo
 
 - Consumes: `prisma`, `auth`, `jsonOk`/`jsonErr`, factories (Task 2); `timeAgo` from `@/lib/time-format` (Task 2); `PageTopBar` (Task 1 — its bell badge counts `readAt: null` rows, so marking read clears the badge on the next server render); `Card`, `Button`, `EmptyState` primitives. Phase 3's publish transaction writes `Notification` rows via `notifyUsers` — this feed displays them.
 - Produces:
-  - `notificationHref(type: string): string` from `@/lib/notification-links` — deep-link table: `schedule_published`/`shift_reminder` → `/` (employee home); `swap_approved`/`swap_denied`/`claim_approved`/`claim_denied`/`open_shift_posted` → `/swaps`; `timeoff_approved`/`timeoff_denied` → `/availability`; unknown → `/`. Phase 5 reuses this.
+  - `notificationHref(type: string): string` from `@/lib/notification-links` — deep-link table: `schedule_published`/`shift_reminder` → `/shifts` (employee home); `swap_approved`/`swap_denied`/`claim_approved`/`claim_denied`/`open_shift_posted` → `/swaps`; `timeoff_approved`/`timeoff_denied` → `/availability`; unknown → `/shifts`. Phase 5 reuses this.
   - `NotificationDto = { id: string; type: string; title: string; body: string; createdAt: string; readAt: string | null }`; `getMyNotifications(userId: string, opts?: { cursor?: string; limit?: number }): Promise<{ notifications: NotificationDto[]; nextCursor: string | null; unreadCount: number }>`; `markNotificationsRead(userId: string, ids?: string[]): Promise<number>` (both in `@/lib/queries/employee`).
   - Endpoints: `GET /api/me/notifications?cursor=&limit=` (newest first, default limit 20, max 50); `POST /api/me/notifications/read` body `{ ids?: string[] }` (omit ids = mark all) → `{ updated: number }`.
 
@@ -3460,8 +3462,8 @@ import { notificationHref } from "./notification-links";
 
 describe("notificationHref", () => {
   it("routes each notification type to its screen", () => {
-    expect(notificationHref("schedule_published")).toBe("/");
-    expect(notificationHref("shift_reminder")).toBe("/");
+    expect(notificationHref("schedule_published")).toBe("/shifts");
+    expect(notificationHref("shift_reminder")).toBe("/shifts");
     expect(notificationHref("swap_approved")).toBe("/swaps");
     expect(notificationHref("swap_denied")).toBe("/swaps");
     expect(notificationHref("claim_approved")).toBe("/swaps");
@@ -3472,7 +3474,7 @@ describe("notificationHref", () => {
   });
 
   it("falls back to the home screen for unknown types", () => {
-    expect(notificationHref("something_new")).toBe("/");
+    expect(notificationHref("something_new")).toBe("/shifts");
   });
 });
 ```
@@ -3497,8 +3499,8 @@ export type NotificationType =
   | "open_shift_posted";
 
 const HREFS: Record<NotificationType, string> = {
-  schedule_published: "/",
-  shift_reminder: "/",
+  schedule_published: "/shifts",
+  shift_reminder: "/shifts",
   swap_approved: "/swaps",
   swap_denied: "/swaps",
   claim_approved: "/swaps",
@@ -3509,7 +3511,7 @@ const HREFS: Record<NotificationType, string> = {
 };
 
 export function notificationHref(type: string): string {
-  return HREFS[type as NotificationType] ?? "/";
+  return HREFS[type as NotificationType] ?? "/shifts";
 }
 ```
 
@@ -3918,7 +3920,7 @@ export default async function NotificationsPage() {
 
   return (
     <div className={styles.screen}>
-      <PageTopBar title="Notifications" backHref="/" showBell={false} />
+      <PageTopBar title="Notifications" backHref="/shifts" showBell={false} />
       <NotificationsList initial={first} />
     </div>
   );
@@ -3947,9 +3949,9 @@ Run: `npm run build` — compiles clean.
 
 Run: `npm run dev`:
 1. As Jamie, publish a draft week from `/manager/schedule` (Phase 3 flow) so Maria gets a `schedule_published` notification.
-2. As Maria, the bell on the home screen (`/`) shows an unread count badge.
+2. As Maria, the bell on the home screen (`/shifts`) shows an unread count badge.
 3. Tap the bell → feed lists notifications newest first with "2h ago"-style stamps; unread ones show a dot and bold title.
-4. Tap the "Schedule published" card → lands on the home screen (`/`).
+4. Tap the "Schedule published" card → lands on the home screen (`/shifts`).
 5. Return to `/notifications` — the badge is gone (marked read), the dot no longer shows on a fresh visit.
 6. With no notifications (fresh test account), the empty state reads "You're all caught up".
 
@@ -4259,7 +4261,7 @@ Run: `npm run dev`, as Maria on `/profile`:
 1. Card shows her initials avatar, "Maria Garcia", and "Line cook · Downtown" (primary position · location).
 2. Toggle "Text messages (SMS)" off → flips instantly; reload → still off (persisted).
 3. Stop the dev server's DB (`docker compose stop`), toggle a switch → it flips, then reverts, and a toast reads "Couldn't save your notification preferences". Restart the DB (`docker compose start`) afterwards.
-4. "Log out" → back at `/login`; visiting `/` redirects to `/login`.
+4. "Log out" → back at `/login`; visiting `/shifts` redirects to `/login`.
 
 - [ ] **Step 7: Commit**
 
@@ -4292,13 +4294,13 @@ Expected: seed completes; build clean; **every** vitest suite green (Phases 1–
 
 - [ ] **Step 2: Manual QA loop (use the `/qa` skill against `npm run dev` if available)**
 
-1. Log in as `maria@harborvine.test` / `rosterhouse1` → lands on the employee home.
+1. Log in as `maria@harborvine.test` / `rosterhouse1` → lands on the employee home (`/shifts`).
 2. Home shows the current week's **published** shifts with 12-hour times ("7:00 AM – 3:00 PM") and a summary like "3 shifts · 24 hrs total". No draft shifts appear.
 3. Open a shift → detail shows time range + duration, Confirmed badge, location, overlapping coworkers with avatars, and the manager note when present. "Request swap" is disabled with a "Coming soon" tooltip.
 4. `/availability`: set Tuesday to 10:00 AM – 4:00 PM in Advanced, save → "Availability saved" toast. Make another change and tap the Shifts tab → discard sheet appears; keep editing; save again.
 5. Log in as `jamie@harborvine.test` / `rosterhouse1` → `/manager/availability` shows **all 10** employees; Maria's Tuesday cell reads "10:00 AM – 4:00 PM"; approved time off shows amber "Time off" cells; the week pager works.
 6. As Jamie, publish next week from `/manager/schedule` (Phase 3 flow).
-7. Back as Maria: the bell badge on the home screen (`/`) shows an unread count; the feed lists "Schedule published" newest-first with a relative timestamp; tapping it deep-links to `/`; returning to the feed shows the badge cleared.
+7. Back as Maria: the bell badge on the home screen (`/shifts`) shows an unread count; the feed lists "Schedule published" newest-first with a relative timestamp; tapping it deep-links to `/shifts`; returning to the feed shows the badge cleared.
 8. `/profile`: toggle a notification channel, reload, confirm it stuck; log out returns to `/login`.
 9. Keyboard pass: Tab through home and availability — every control (tabs, switches, time fields, save, tab bar, bell) is reachable with a visible focus ring; no dead onClick divs anywhere.
 

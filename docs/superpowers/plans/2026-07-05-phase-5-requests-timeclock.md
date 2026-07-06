@@ -34,7 +34,7 @@ These exist already; use them verbatim (signatures from the roadmap's shared con
 // @/lib/auth
 export const { handlers, auth, signIn, signOut }: NextAuthResult; // session.user: { id, name, role: 'manager'|'employee', organizationId }
 requireUser(): Promise<SessionUser>;    // pages; redirect('/login') if absent
-requireManager(): Promise<SessionUser>; // pages; + redirect('/') if employee
+requireManager(): Promise<SessionUser>; // pages; + redirect('/shifts') if employee
 
 // @/lib/authz
 getManagerLocation(userId: string): Promise<Location>;
@@ -2037,7 +2037,7 @@ import { formatMediumDate, formatShiftRange } from "@/lib/time";
 import { SwapComposer } from "@/components/employee/SwapComposer";
 
 export default async function SwapComposerPage({ params }: { params: Promise<{ shiftId: string }> }) {
-  if (!SWAPS_ENABLED) redirect("/");
+  if (!SWAPS_ENABLED) redirect("/shifts");
   const { shiftId } = await params;
   const user = await requireUser();
   const profile = await getEmployeeProfile(user.id);
@@ -5022,8 +5022,8 @@ afterEach(() => {
 
 describe("deepLinkFor", () => {
   it("maps every notification type to an employee-app path", () => {
-    expect(deepLinkFor("schedule_published")).toBe("http://localhost:3000/");
-    expect(deepLinkFor("shift_reminder")).toBe("http://localhost:3000/");
+    expect(deepLinkFor("schedule_published")).toBe("http://localhost:3000/shifts");
+    expect(deepLinkFor("shift_reminder")).toBe("http://localhost:3000/shifts");
     expect(deepLinkFor("swap_approved")).toBe("http://localhost:3000/swaps");
     expect(deepLinkFor("swap_denied")).toBe("http://localhost:3000/swaps");
     expect(deepLinkFor("claim_approved")).toBe("http://localhost:3000/swaps");
@@ -5068,8 +5068,8 @@ Expected: FAIL — cannot resolve `@/lib/notify/templates`.
 import type { NotificationType } from "@/generated/prisma/client";
 
 const DEEP_LINK_PATHS: Record<NotificationType, string> = {
-  schedule_published: "/",
-  shift_reminder: "/",
+  schedule_published: "/shifts",
+  shift_reminder: "/shifts",
   swap_approved: "/swaps",
   swap_denied: "/swaps",
   timeoff_approved: "/availability",

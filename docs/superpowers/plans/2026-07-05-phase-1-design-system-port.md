@@ -4243,7 +4243,7 @@ Nav destinations are the roadmap route map. **The routes do not exist yet** — 
 - Consumes: `cx`, `Icon`, `IconName`, `initialsOf`, `next/link`, `next/navigation` (`usePathname`), tokens.
 - Produces (all from `@/components/chrome/...`):
   - `ManagerSidebar` (`'use client'`): `type ManagerSidebarProps = { locationName: string; userName: string }`. Fixed 232px left rail, brand green surface. Nav (exact hrefs, exact sentence-case labels, exact icons): Dashboard `/manager` `layout-dashboard` (exact match), Schedule `/manager/schedule` `calendar`, Team `/manager/team` `users`, Availability `/manager/availability` `calendar-check`, Time off `/manager/time-off` `clock`, Swaps & open shifts `/manager/swaps` `repeat` (prefix match for all non-dashboard items). Active item gets `aria-current="page"`. Location chip is static display (multi-location switching is out of scope). Phase 2 supplies the real `locationName`/`userName` from the session.
-  - `EmployeeTabBar` (`'use client'`): `type EmployeeTabBarProps = { className?: string }`. Five links: Shifts `/` `calendar` (active on `/` or `/shifts/*`), Availability `/availability` `calendar-check`, Clock `/clock` `timer`, Open shifts `/swaps` `repeat`, Profile `/profile` `user`. Active link gets `aria-current="page"`.
+  - `EmployeeTabBar` (`'use client'`): `type EmployeeTabBarProps = { className?: string }`. Five links: Shifts `/shifts` `calendar` (active on `/shifts` or `/shifts/*`), Availability `/availability` `calendar-check`, Clock `/clock` `timer`, Open shifts `/swaps` `repeat`, Profile `/profile` `user`. Active link gets `aria-current="page"`.
   - `EmployeeTopBar` (server-safe): `type EmployeeTopBarProps = { title: string; backHref?: string; action?: React.ReactNode; className?: string }`. `backHref` renders a chevron-left link labelled "Back"; `action` is a right-side slot (Phase 4 puts the notification bell there).
   - `DatePager` (server-safe): `type DatePagerProps = { label: string; prevHref: string; nextHref: string; todayHref?: string; prevLabel?: string; nextLabel?: string; className?: string }`. Defaults `prevLabel="Previous"`, `nextLabel="Next"` (Phase 3 passes "Previous week" etc.). All controls are `next/link` anchors — paging is URL state per the roadmap (`?week=YYYY-MM-DD`).
 
@@ -4326,13 +4326,13 @@ describe("EmployeeTabBar", () => {
 
 describe("EmployeeTopBar", () => {
   it("renders the title as a heading and an optional back link", () => {
-    render(<EmployeeTopBar title="Shift detail" backHref="/" />);
+    render(<EmployeeTopBar title="Shift detail" backHref="/shifts" />);
     expect(
       screen.getByRole("heading", { name: "Shift detail" })
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Back" })).toHaveAttribute(
       "href",
-      "/"
+      "/shifts"
     );
   });
 
@@ -4594,7 +4594,7 @@ import { cx } from "@/components/ui/cx";
 import styles from "./EmployeeTabBar.module.css";
 
 const TABS: Array<{ href: string; label: string; icon: IconName }> = [
-  { href: "/", label: "Shifts", icon: "calendar" },
+  { href: "/shifts", label: "Shifts", icon: "calendar" },
   { href: "/availability", label: "Availability", icon: "calendar-check" },
   { href: "/clock", label: "Clock", icon: "timer" },
   { href: "/swaps", label: "Open shifts", icon: "repeat" },
@@ -4602,8 +4602,7 @@ const TABS: Array<{ href: string; label: string; icon: IconName }> = [
 ];
 
 function isActive(href: string, pathname: string): boolean {
-  if (href === "/") return pathname === "/" || pathname.startsWith("/shifts");
-  return pathname.startsWith(href);
+  return pathname === href || pathname.startsWith(`${href}/`);
 }
 
 export type EmployeeTabBarProps = { className?: string };
