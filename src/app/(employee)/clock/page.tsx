@@ -1,15 +1,11 @@
-import { PageTopBar } from "@/components/employee/PageTopBar";
-import { EmptyState } from "@/components/ui/EmptyState";
-import styles from "@/components/employee/employee.module.css";
+import { requireUser } from "@/lib/auth";
+import { getEmployeeProfile } from "@/lib/authz";
+import { getTimeClockState } from "@/lib/timeclock";
+import { TimeClock } from "@/components/employee/TimeClock";
 
-export default function ClockPage() {
-  return (
-    <div className={styles.screen}>
-      <PageTopBar title="Time clock" />
-      <EmptyState
-        title="The time clock is coming soon"
-        description="You'll clock in and out of your shifts here."
-      />
-    </div>
-  );
+export default async function ClockPage() {
+  const user = await requireUser();
+  const profile = await getEmployeeProfile(user.id);
+  const state = await getTimeClockState(profile.id);
+  return <TimeClock initial={state} />;
 }
