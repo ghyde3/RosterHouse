@@ -1,0 +1,62 @@
+.root {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-sans);
+  font-size: var(--text-body-size);
+  color: var(--text-primary);
+  cursor: pointer;
+  position: relative;
+}
+
+.isDisabled {
+  color: var(--text-tertiary);
+  cursor: not-allowed;
+}
+
+/* Real input, visually hidden but still focusable/clickable */
+.input {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  opacity: 0;
+  margin: 0;
+  cursor: inherit;
+}
+
+.box {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface-card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-contrast);
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
+}
+
+.mark {
+  visibility: hidden;
+}
+
+.input:checked + .box {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+.input:checked + .box .mark {
+  visibility: visible;
+}
+
+.input:focus-visible + .box {
+  box-shadow: var(--shadow-focus);
+}
+
+.input:disabled + .box {
+  opacity: 0.5;
+}
