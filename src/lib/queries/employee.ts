@@ -247,3 +247,49 @@ export async function getMyAvailability(profileId: string): Promise<Availability
   }
   return rules;
 }
+
+export type NotificationDto = {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  createdAt: string; // ISO instant
+  readAt: string | null;
+};
+
+export async function getMyNotifications(
+  userId: string,
+  opts?: { cursor?: string; limit?: number }
+): Promise<{ notifications: NotificationDto[]; nextCursor: string | null; unreadCount: number }> {
+  const limit = Math.min(Math.max(opts?.limit ?? 20, 1), 50);
+  const rows = await prisma.notification.findMany({
+    where: { userId },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take: limit + 1,
+    ...(opts?.cursor ? { cursor: { id: opts.cursor }, skip: 1 } : {}),
+  });
+  const page = rows.slice(0, limit);
+  const nextCursor = rows.length > limit ? page[page.length - 1].id : null;
+  const unreadCount = await prisma.notification.count({ where: { userId, readAt: null } });
+  return {
+    notifications: page.map((n) => ({
+      id: n.id,
+      type: n.type,
+      title: n.title,
+      body: n.body,
+      createdAt: n.createdAt.toISOString(),
+      readAt: n.readAt ? n.readAt.toISOString() : null,
+    })),
+    nextCursor,
+    unreadCount,
+  };
+}
+
+/** Marks the given notifications (or all unread when ids omitted) as read. Only touches the caller's rows. */
+export async function markNotificationsRead(userId: string, ids?: string[]): Promise<number> {
+  const res = await prisma.notification.updateMany({
+    where: { userId, readAt: null, ...(ids ? { id: { in: ids } } : {}) },
+    data: { readAt: new Date() },
+  });
+  return res.count;
+}

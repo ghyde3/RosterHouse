@@ -1,12 +1,17 @@
+import { requireUser } from "@/lib/auth";
+import { getMyNotifications } from "@/lib/queries/employee";
 import { PageTopBar } from "@/components/employee/PageTopBar";
-import { EmptyState } from "@/components/ui/EmptyState";
+import { NotificationsList } from "./NotificationsList";
 import styles from "@/components/employee/employee.module.css";
 
-export default function NotificationsPage() {
+export default async function NotificationsPage() {
+  const user = await requireUser();
+  const first = await getMyNotifications(user.id, { limit: 20 });
+
   return (
     <div className={styles.screen}>
       <PageTopBar title="Notifications" backHref="/shifts" showBell={false} />
-      <EmptyState title="Notifications are coming soon" description="This screen is being built." />
+      <NotificationsList initial={first} />
     </div>
   );
 }
