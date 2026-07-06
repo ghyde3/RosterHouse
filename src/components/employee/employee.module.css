@@ -1,0 +1,151 @@
+.screen {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 0 20px 24px;
+}
+
+.sectionTitle {
+  font-size: var(--text-h3-size);
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-top: 6px;
+}
+
+.muted {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.subtle {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.cardRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.cardStack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dayLabel {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.shiftTitle {
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-top: 2px;
+}
+
+.summaryCard {
+  background: var(--surface-brand);
+  color: var(--text-inverse);
+  border-radius: var(--radius-xl);
+  padding: var(--space-6);
+}
+
+.summaryTitle {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.summarySub {
+  font-size: 13px;
+  color: var(--green-200);
+  margin-top: 4px;
+}
+
+.linkReset {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+.linkBrand {
+  color: var(--text-brand);
+  font-weight: 600;
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.linkBrand:hover {
+  text-decoration: underline;
+}
+
+.iconRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.profileRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.notifTitle {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.notifTitleUnread {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.notifMeta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+.unreadDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-primary);
+}
+
+.errorWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 64px 20px;
+  text-align: center;
+}
+
+.errorTitle {
+  font-size: var(--text-h2-size);
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.skeleton {
+  background: var(--surface-sunken);
+  border-radius: var(--radius-md);
+  animation: skeletonPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes skeletonPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}

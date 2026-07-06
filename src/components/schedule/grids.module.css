@@ -1,0 +1,170 @@
+.weekGrid {
+  font-family: var(--font-sans);
+}
+
+.headerRow {
+  display: grid;
+  grid-template-columns: 110px repeat(7, minmax(128px, 1fr));
+  gap: 8px;
+  position: sticky;
+  top: 0;
+  background: var(--surface-page);
+  z-index: 2;
+  padding-bottom: 8px;
+}
+
+.dayLabel {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-align: center;
+}
+
+.positionRow {
+  display: grid;
+  grid-template-columns: 110px repeat(7, minmax(128px, 1fr));
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.positionLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  padding-top: 6px;
+}
+
+.cellStack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.addButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 5px 0;
+  width: 100%;
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--border-strong);
+  background: transparent;
+  color: var(--text-tertiary);
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.addButton:hover {
+  color: var(--text-secondary);
+  border-color: var(--text-tertiary);
+}
+
+.addButton:active {
+  color: var(--text-primary);
+}
+
+.addButton:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
+.emptyBanner {
+  margin-bottom: 12px;
+}
+
+/* Day view */
+.dayList {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  font-family: var(--font-sans);
+}
+
+.dayEmpty {
+  font-size: 14px;
+  color: var(--text-tertiary);
+}
+
+.dayGroupTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.dayGroupStack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 460px;
+}
+
+.dayAddButton {
+  composes: addButton;
+  padding: 7px 0;
+  font-size: 12px;
+}
+
+/* Month view */
+.monthGrid {
+  font-family: var(--font-sans);
+}
+
+.monthHeaderRow {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.monthHeaderCell {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.monthCells {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+}
+
+.monthCell {
+  min-height: 78px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+  padding: 8px;
+  cursor: pointer;
+  background: var(--surface-card);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  font-family: var(--font-sans);
+  text-align: left;
+}
+
+.monthCell:hover {
+  border-color: var(--border-strong);
+}
+
+.monthCell:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
+.monthCellOutside {
+  background: var(--surface-sunken);
+  opacity: 0.5;
+}
+
+.monthDayNumber {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}

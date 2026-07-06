@@ -213,8 +213,6 @@ async function main() {
       locationId: location.id,
       weekStartDate: dateOnly(currentMonday),
       status: "published",
-      publishedAt: new Date(),
-      publishedByUserId: manager.id,
     },
   });
   const nextSchedule = await prisma.schedule.create({
@@ -247,6 +245,14 @@ async function main() {
 
   await createShifts(currentSchedule.id, currentMonday, CURRENT_WEEK_SHIFTS, "published");
   await createShifts(nextSchedule.id, nextMonday, NEXT_WEEK_SHIFTS, "draft");
+
+  // publishedAt must be set AFTER shift creation (mirrors the publish API's own
+  // ordering) so hasUnpublishedChanges — which compares shift.updatedAt against
+  // schedule.publishedAt — doesn't flag a freshly-seeded published week as dirty.
+  await prisma.schedule.update({
+    where: { id: currentSchedule.id },
+    data: { publishedAt: new Date(), publishedByUserId: manager.id },
+  });
 
   // One pending time-off request: Alex Kim, Thu-Fri of next week.
   await prisma.timeOffRequest.create({
