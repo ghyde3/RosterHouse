@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { handleApiError, jsonErr, jsonOk, parseJson } from "@/lib/api";
+import { ApiError, handleApiError, jsonErr, jsonOk, parseJson } from "@/lib/api";
 import { hashPassword } from "@/lib/authz";
 import { prisma } from "@/lib/db";
 import { normalizePhone } from "@/lib/phone";
@@ -42,6 +42,22 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     const passwordHash = await hashPassword(password); // slow — outside the transaction
 
     await prisma.$transaction(async (tx) => {
+      // Atomically claim the invite as the FIRST write in the transaction.
+      // The outer pre-check above is only a fast-path convenience — it reads
+      // outside the transaction, so two concurrent accepts can both pass it.
+      // This conditional updateMany is the real guard: only one concurrent
+      // caller's WHERE (id, status: "pending") can match and flip the row,
+      // because the row-level lock it takes serializes the other caller
+      // behind it, and by the time that caller runs, status is no longer
+      // "pending".
+      const claimed = await tx.invite.updateMany({
+        where: { id: invite.id, status: "pending" },
+        data: { status: "accepted" },
+      });
+      if (claimed.count === 0) {
+        throw new ApiError(410, "invite_used", "That invite has already been used. Try logging in instead.");
+      }
+
       // The invitee didn't choose the invite's email; if it's taken, drop it
       // rather than block them — they log in by phone.
       let email = invite.email?.toLowerCase() ?? null;
@@ -73,7 +89,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
           data: { employeeProfileId: profile.id, positionId: invite.positionId },
         });
       }
-      await tx.invite.update({ where: { id: invite.id }, data: { status: "accepted" } });
     });
 
     return jsonOk({ signedUp: true }, 201);

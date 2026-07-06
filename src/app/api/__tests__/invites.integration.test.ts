@@ -229,4 +229,38 @@ describe("POST /api/invites/[token]/accept", () => {
     const body = await res.json();
     expect(body.error.code).toBe("invalid_phone");
   });
+
+  it("only lets one of two truly concurrent accepts win the same invite", async () => {
+    const token = await freshInvite();
+    const phoneA = `+1701${String(Date.now()).slice(-7)}`;
+    const phoneB = `+1702${String(Date.now()).slice(-7)}`;
+
+    const [resA, resB] = await Promise.all([
+      acceptInvite(
+        jsonPost(`http://test.local/api/invites/${token}/accept`, { name: "Racer A", phone: phoneA, password: "rosterhouse1" }),
+        params({ token }),
+      ),
+      acceptInvite(
+        jsonPost(`http://test.local/api/invites/${token}/accept`, { name: "Racer B", phone: phoneB, password: "rosterhouse1" }),
+        params({ token }),
+      ),
+    ]);
+
+    const statuses = [resA.status, resB.status].sort();
+    expect(statuses).toEqual([201, 410]);
+
+    const bodies = await Promise.all([resA.json(), resB.json()]);
+    const losing = bodies.find((b) => !b.ok);
+    expect(losing.error.code).toBe("invite_used");
+
+    const invite = await prisma.invite.findUnique({ where: { token } });
+    expect(invite!.status).toBe("accepted");
+
+    const users = await prisma.user.findMany({ where: { phone: { in: [phoneA, phoneB] } } });
+    expect(users).toHaveLength(1);
+
+    await prisma.employeePosition.deleteMany({ where: { employeeProfile: { userId: users[0].id } } });
+    await prisma.employeeProfile.deleteMany({ where: { userId: users[0].id } });
+    await prisma.user.delete({ where: { id: users[0].id } });
+  });
 });
