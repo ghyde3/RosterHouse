@@ -1,6 +1,7 @@
 import type { NotificationType } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db";
 import { consoleDriver } from "./console-driver";
+import { smsBodyFor } from "./templates";
 
 export type NotifyInput = {
   userId: string;
@@ -36,7 +37,7 @@ export async function notifyUsers(
     const channels: string[] = [];
 
     if (prefs?.notifySms && user.phone) {
-      await driver.sendSms(user.phone, `${input.title} — ${input.body}`);
+      await driver.sendSms(user.phone, smsBodyFor(input));
       channels.push("sms");
     }
     if (prefs?.notifyPush && user.pushDevices.length > 0) {

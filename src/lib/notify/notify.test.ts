@@ -99,7 +99,10 @@ describe("notifyUsers", () => {
     expect(rows.find((r) => r.userId === quietUserId)?.channelsSent).toEqual([]);
 
     expect(sms).toEqual([
-      { phone: "+15550001111", body: "New schedule published — Your schedule for the week of Jul 6 is ready." },
+      {
+        phone: "+15550001111",
+        body: "RosterHouse: New schedule published. Your schedule for the week of Jul 6 is ready. http://localhost:3000/shifts",
+      },
     ]);
     expect(push).toEqual([{ token: "device-token-1", title: "New schedule published" }]);
   });
