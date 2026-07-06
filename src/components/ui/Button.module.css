@@ -99,7 +99,7 @@
 
 .button[data-variant="danger"] {
   background: var(--status-danger);
-  /* export used #fff — raw hex is banned; the token is identical */
+  /* export used white directly — raw hex is banned; the token is identical */
   color: var(--neutral-0);
 }
 .button[data-variant="danger"]:not(:disabled):hover {

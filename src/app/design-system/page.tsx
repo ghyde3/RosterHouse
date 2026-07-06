@@ -170,8 +170,8 @@ function TimeFieldSection() {
         <TimeField label="Start time" value={start} onChange={setStart} />
       </div>
       <p style={{ fontSize: "var(--text-body-sm-size)", color: "var(--text-secondary)" }}>
-        Try "7:00 AM" (valid) and "25:00" (invalid, error appears after you
-        leave the field).
+        Try &quot;7:00 AM&quot; (valid) and &quot;25:00&quot; (invalid, error
+        appears after you leave the field).
       </p>
     </Section>
   );
@@ -395,7 +395,7 @@ function SchedulingSection() {
         <AvatarStatus name="Alex Kim" status="off" />
         <Avatar name="Jamie Park" />
         <ConflictChip>
-          This shift overlaps with Maria's 2:00 PM – 6:00 PM shift
+          This shift overlaps with Maria&apos;s 2:00 PM – 6:00 PM shift
         </ConflictChip>
       </Row>
     </Section>
