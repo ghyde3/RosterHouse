@@ -19,6 +19,7 @@ import { GET as getShiftCounts } from "@/app/api/locations/[locationId]/shifts/r
 import { POST as createShift } from "@/app/api/shifts/route";
 import { DELETE as deleteShift, PATCH as patchShift } from "@/app/api/shifts/[shiftId]/route";
 import { POST as validateShift } from "@/app/api/shifts/validate/route";
+import { createFixture, destroyFixture, type Fixture } from "./helpers/factory";
 
 const NY = "America/New_York";
 let locationId: string;
@@ -192,6 +193,33 @@ describe("POST /api/shifts/validate", () => {
       }),
     );
     expect((await res.json()).data.conflicts).toEqual([]);
+  });
+
+  it("404s instead of leaking conflict data for a foreign-org employeeProfileId", async () => {
+    // Org A is the manager's own org (jamie/harborvine, via mockSession). Org B
+    // is a freshly created, unrelated org whose employee profile the manager
+    // should have zero visibility into.
+    const orgB: Fixture = await createFixture();
+    try {
+      const position = await prisma.position.findFirstOrThrow({ where: { locationId } });
+      const res = await validateShift(
+        jsonRequest("http://test/api/shifts/validate", "POST", {
+          locationId,
+          positionId: position.id,
+          employeeProfileId: orgB.ana.profileId,
+          date: "2026-07-06",
+          startTime: "9:00 AM",
+          endTime: "5:00 PM",
+        }),
+      );
+      expect(res.status).toBe(404);
+      const body = await res.json();
+      expect(body.ok).toBe(false);
+      expect(body.error.code).toBe("not_found");
+      expect(body.error.message).toBe("That employee isn't on this location's team");
+    } finally {
+      await destroyFixture(orgB);
+    }
   });
 });
 

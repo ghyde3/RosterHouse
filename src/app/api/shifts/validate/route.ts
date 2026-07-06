@@ -1,6 +1,7 @@
 import { handleApiError, jsonErr, jsonOk } from "@/lib/api";
 import { buildConflictContext } from "@/lib/conflict-context";
 import { detectConflicts } from "@/lib/conflicts";
+import { prisma } from "@/lib/db";
 import { requireManagerForApi } from "@/lib/manager-guard";
 import { validateShiftSchema } from "@/lib/shift-schemas";
 import { parseTime12h, shiftInstants, weekStartOfISO } from "@/lib/time";
@@ -26,6 +27,12 @@ export async function POST(req: Request) {
       return jsonErr("forbidden", "You don't have access to this location", 403);
     }
     if (input.employeeProfileId === null) return jsonOk({ conflicts: [] });
+    const profile = await prisma.employeeProfile.findFirst({
+      where: { id: input.employeeProfileId, locationId: guard.location.id },
+    });
+    if (!profile) {
+      return jsonErr("not_found", "That employee isn't on this location's team", 404);
+    }
 
     const { startsAt, endsAt } = shiftInstants(
       input.date,
