@@ -284,3 +284,16 @@ export async function listMyUpcomingShifts(employeeProfileId: string, limit = 5)
     hasPendingSwap: s.swapRequests.length > 0,
   }));
 }
+
+export async function countPendingRequests(locationId: string): Promise<number> {
+  const [timeOff, swaps, claims] = await Promise.all([
+    prisma.timeOffRequest.count({ where: { status: "pending", employeeProfile: { locationId } } }),
+    prisma.swapRequest.count({ where: { status: "pending", shift: { locationId } } }),
+    prisma.openShiftClaim.count({ where: { status: "pending", shift: { locationId } } }),
+  ]);
+  return timeOff + swaps + claims;
+}
+
+export async function countClockedInNow(locationId: string): Promise<number> {
+  return prisma.timeClockEntry.count({ where: { locationId, clockOutAt: null } });
+}

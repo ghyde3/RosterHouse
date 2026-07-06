@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { countPendingRequests } from "@/lib/requests";
 import { getScheduleWeekData } from "@/lib/schedule-data";
 import {
   addDaysISO,
@@ -26,7 +27,7 @@ export async function getDashboardData(
   const weekStart = weekStartOf(new Date(), timezone);
   const weekEnd = addDaysISO(weekStart, 6);
 
-  const [shifts, pendingTimeOff, pendingSwaps, pendingClaims, clockEntries, weekData] =
+  const [shifts, pendingTimeOff, pendingSwaps, pendingClaims, pendingRequests, clockEntries, weekData] =
     await Promise.all([
       prisma.shift.findMany({
         where: { locationId, date: { gte: new Date(weekStart), lte: new Date(weekEnd) } },
@@ -37,6 +38,7 @@ export async function getDashboardData(
       }),
       prisma.swapRequest.count({ where: { status: "pending", shift: { locationId } } }),
       prisma.openShiftClaim.count({ where: { status: "pending", shift: { locationId } } }),
+      countPendingRequests(locationId),
       prisma.timeClockEntry.findMany({
         where: { locationId, clockOutAt: null },
         include: { employeeProfile: { include: { user: true, primaryPosition: true } } },
@@ -67,7 +69,7 @@ export async function getDashboardData(
     pendingTimeOff,
     pendingSwaps,
     pendingClaims,
-    pendingRequests: pendingTimeOff + pendingSwaps + pendingClaims,
+    pendingRequests,
     projectedLaborCost,
     conflictCountThisWeek: weekData.conflictCount,
     clockedInNow: clockEntries.map((e) => ({
