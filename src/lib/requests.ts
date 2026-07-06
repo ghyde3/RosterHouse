@@ -201,6 +201,62 @@ export async function listMyRequests(employeeProfileId: string): Promise<MyReque
   return items.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
+export type ApprovalItem = {
+  id: string;
+  kind: "swap" | "claim";
+  employeeName: string;
+  detail: string;
+  subDetail: string;
+  note: string | null;
+  createdAt: string;
+};
+
+export async function listPendingApprovals(locationId: string): Promise<ApprovalItem[]> {
+  const location = await prisma.location.findUniqueOrThrow({ where: { id: locationId } });
+  const tz = location.timezone;
+  const shiftLabel = (shift: { date: Date; startsAt: Date; endsAt: Date; position: { name: string } }) =>
+    `${formatMediumDate(isoDateOf(shift.date))} ${shift.position.name} shift, ${formatShiftRange(shift.startsAt, shift.endsAt, tz)}`;
+
+  const [swaps, claims] = await Promise.all([
+    prisma.swapRequest.findMany({
+      where: { status: "pending", shift: { locationId } },
+      include: {
+        shift: { include: { position: true } },
+        requester: { include: { user: true } },
+        coverer: { include: { user: true } },
+      },
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.openShiftClaim.findMany({
+      where: { status: "pending", shift: { locationId } },
+      include: { shift: { include: { position: true } }, employeeProfile: { include: { user: true } } },
+      orderBy: { createdAt: "asc" },
+    }),
+  ]);
+
+  const items: ApprovalItem[] = [
+    ...swaps.map((r) => ({
+      id: r.id,
+      kind: "swap" as const,
+      employeeName: r.requester.user.name,
+      detail: `Wants to swap their ${shiftLabel(r.shift)}`,
+      subDetail: r.coverer ? `${r.coverer.user.name} offered to cover` : "Open to anyone qualified",
+      note: r.note,
+      createdAt: r.createdAt.toISOString(),
+    })),
+    ...claims.map((c) => ({
+      id: c.id,
+      kind: "claim" as const,
+      employeeName: c.employeeProfile.user.name,
+      detail: `Wants to pick up the open ${shiftLabel(c.shift)}`,
+      subDetail: "Awaiting your approval",
+      note: null,
+      createdAt: c.createdAt.toISOString(),
+    })),
+  ];
+  return items.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
+
 export type SwappableShift = {
   shiftId: string;
   dayLabel: string;
