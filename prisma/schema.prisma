@@ -1,7 +1,11 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
+// RosterHouse domain schema — first cut, derived from the design-export
+// review (see docs/superpowers/specs/). Conventions:
+// - Two-level tenancy: Organization → Location. Every domain row is
+//   location-scoped; API handlers must enforce membership, not just the UI.
+// - Shift times are UTC instants plus a location-local service `date`
+//   (shifts can cross midnight and belong to the starting day's column).
+// - Conflict status (double-booked / outside availability / overtime) is
+//   DERIVED at read time, never stored. Open shift = employeeProfileId NULL.
 
 generator client {
   provider = "prisma-client"
@@ -10,4 +14,332 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+enum UserRole {
+  manager
+  employee
+}
+
+enum EmployeeStatus {
+  invited
+  active
+  inactive
+}
+
+enum InviteStatus {
+  pending
+  accepted
+  expired
+}
+
+enum ScheduleStatus {
+  draft
+  published
+}
+
+enum ShiftStatus {
+  draft
+  published
+}
+
+enum TimeOffReason {
+  vacation
+  sick
+  personal
+  other
+}
+
+enum RequestStatus {
+  pending
+  approved
+  denied
+  cancelled
+}
+
+enum NotificationType {
+  schedule_published
+  shift_reminder
+  swap_approved
+  swap_denied
+  timeoff_approved
+  timeoff_denied
+  claim_approved
+  claim_denied
+  open_shift_posted
+}
+
+model Organization {
+  id        String     @id @default(cuid())
+  name      String
+  createdAt DateTime   @default(now())
+  locations Location[]
+  users     User[]
+  invites   Invite[]
+}
+
+model Location {
+  id             String  @id @default(cuid())
+  organizationId String
+  name           String
+  timezone       String  @default("America/New_York") // IANA; source of truth for wall-clock rendering
+  address        String?
+  // Geofenced clock-in ("uses your phone's location to confirm you're on-site")
+  latitude        Decimal?
+  longitude       Decimal?
+  geofenceRadiusM Int?
+  // Weekly overtime threshold for conflict detection; NULL disables OT conflicts
+  overtimeHoursPerWeek Int?     @default(40)
+  createdAt            DateTime @default(now())
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  positions    Position[]
+  employees    EmployeeProfile[]
+  schedules    Schedule[]
+  shifts       Shift[]
+  invites      Invite[]
+  clockEntries TimeClockEntry[]
+}
+
+model User {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  email          String?  @unique
+  phone          String?  @unique
+  passwordHash   String
+  role           UserRole
+  createdAt      DateTime @default(now())
+
+  organization  Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  profiles      EmployeeProfile[]
+  notifications Notification[]
+  pushDevices   PushDevice[]
+  sentInvites   Invite[]          @relation("Inviter")
+}
+
+// One membership per (user, location). Managers may also hold profiles for
+// locations they staff at.
+model EmployeeProfile {
+  id                String         @id @default(cuid())
+  userId            String
+  locationId        String
+  primaryPositionId String? // headline role ("Maria Garcia · Line cook")
+  hourlyRate        Decimal? // powers "Projected labor cost"; edited in team settings
+  status            EmployeeStatus @default(invited)
+  notifyPush        Boolean        @default(true)
+  notifySms         Boolean        @default(true)
+  notifyEmail       Boolean        @default(false)
+
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  location        Location           @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  primaryPosition Position?          @relation("PrimaryPosition", fields: [primaryPositionId], references: [id])
+  positions       EmployeePosition[]
+  shifts          Shift[]
+  availability    AvailabilityRule[]
+  timeOffRequests TimeOffRequest[]
+  swapRequests    SwapRequest[]      @relation("SwapRequester")
+  swapsCovering   SwapRequest[]      @relation("SwapCoverer")
+  openShiftClaims OpenShiftClaim[]
+  clockEntries    TimeClockEntry[]
+
+  @@unique([userId, locationId])
+}
+
+// Qualification join: employees work multiple positions (the design's own
+// seed data has a Server and a Host picking up Dishwasher shifts). Drives
+// eligibility filtering in assignment, open-shift claims, and
+// "anyone qualified" swaps.
+model EmployeePosition {
+  employeeProfileId String
+  positionId        String
+
+  employeeProfile EmployeeProfile @relation(fields: [employeeProfileId], references: [id], onDelete: Cascade)
+  position        Position        @relation(fields: [positionId], references: [id], onDelete: Cascade)
+
+  @@id([employeeProfileId, positionId])
+}
+
+model Invite {
+  id              String       @id @default(cuid())
+  organizationId  String
+  locationId      String
+  invitedByUserId String
+  positionId      String?
+  name            String?
+  phone           String?
+  email           String?
+  token           String       @unique
+  status          InviteStatus @default(pending)
+  expiresAt       DateTime?
+  createdAt       DateTime     @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  location     Location     @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  invitedBy    User         @relation("Inviter", fields: [invitedByUserId], references: [id])
+  position     Position?    @relation(fields: [positionId], references: [id])
+}
+
+model Position {
+  id         String   @id @default(cuid())
+  locationId String
+  name       String
+  sortOrder  Int      @default(0) // week grid renders positions as fixed ordered rows
+  createdAt  DateTime @default(now())
+
+  location         Location           @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  shifts           Shift[]
+  employees        EmployeePosition[]
+  primaryFor       EmployeeProfile[]  @relation("PrimaryPosition")
+  invites          Invite[]
+
+  @@unique([locationId, name])
+}
+
+model Schedule {
+  id                String         @id @default(cuid())
+  locationId        String
+  weekStartDate     DateTime       @db.Date // Monday — grid and month view are Monday-first
+  status            ScheduleStatus @default(draft)
+  publishedAt       DateTime?
+  publishedByUserId String?
+  createdAt         DateTime       @default(now())
+
+  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  shifts   Shift[]
+
+  @@unique([locationId, weekStartDate])
+}
+
+model Shift {
+  id                String      @id @default(cuid())
+  scheduleId        String
+  locationId        String // denormalized for date-range queries (month view)
+  positionId        String
+  employeeProfileId String? // NULL = open shift
+  date              DateTime    @db.Date // location-local service date (start day)
+  startsAt          DateTime // UTC instant
+  endsAt            DateTime // UTC instant; may cross local midnight
+  status            ShiftStatus @default(draft)
+  notes             String? // "Bring your own knife kit." — shown on employee shift detail
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  schedule        Schedule         @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  location        Location         @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  position        Position         @relation(fields: [positionId], references: [id])
+  employeeProfile EmployeeProfile? @relation(fields: [employeeProfileId], references: [id])
+  swapRequests    SwapRequest[]
+  claims          OpenShiftClaim[]
+  clockEntries    TimeClockEntry[]
+
+  @@index([locationId, date])
+  @@index([employeeProfileId, date])
+}
+
+// Weekly recurring availability, one row per weekday
+// ("repeats every week until you change it").
+model AvailabilityRule {
+  id                String   @id @default(cuid())
+  employeeProfileId String
+  dayOfWeek         Int // 0=Mon..6=Sun, matching the UI order
+  isAvailable       Boolean  @default(true)
+  startTime         String? // "09:00" location-local; NULL = all day
+  endTime           String?
+  updatedAt         DateTime @updatedAt
+
+  employeeProfile EmployeeProfile @relation(fields: [employeeProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeProfileId, dayOfWeek])
+}
+
+model TimeOffRequest {
+  id                String        @id @default(cuid())
+  employeeProfileId String
+  startDate         DateTime      @db.Date
+  endDate           DateTime      @db.Date
+  reason            TimeOffReason
+  note              String?
+  status            RequestStatus @default(pending)
+  decidedByUserId   String?
+  decidedAt         DateTime?
+  createdAt         DateTime      @default(now())
+
+  employeeProfile EmployeeProfile @relation(fields: [employeeProfileId], references: [id], onDelete: Cascade)
+}
+
+model SwapRequest {
+  id                           String        @id @default(cuid())
+  shiftId                      String
+  requestingEmployeeProfileId  String
+  coveringEmployeeProfileId    String? // NULL = "Open to anyone qualified"
+  note                         String?
+  status                       RequestStatus @default(pending)
+  decidedByUserId              String?
+  decidedAt                    DateTime?
+  createdAt                    DateTime      @default(now())
+
+  shift     Shift           @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  requester EmployeeProfile @relation("SwapRequester", fields: [requestingEmployeeProfileId], references: [id], onDelete: Cascade)
+  coverer   EmployeeProfile? @relation("SwapCoverer", fields: [coveringEmployeeProfileId], references: [id])
+}
+
+model OpenShiftClaim {
+  id                String        @id @default(cuid())
+  shiftId           String
+  employeeProfileId String
+  status            RequestStatus @default(pending)
+  decidedByUserId   String?
+  decidedAt         DateTime?
+  createdAt         DateTime      @default(now())
+
+  shift           Shift           @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  employeeProfile EmployeeProfile @relation(fields: [employeeProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([shiftId, employeeProfileId])
+}
+
+model TimeClockEntry {
+  id                String    @id @default(cuid())
+  employeeProfileId String
+  shiftId           String?
+  locationId        String
+  clockInAt         DateTime
+  clockOutAt        DateTime? // NULL = currently clocked in
+  clockInLat        Decimal?
+  clockInLng        Decimal?
+  clockOutLat       Decimal?
+  clockOutLng       Decimal?
+  createdAt         DateTime  @default(now())
+
+  employeeProfile EmployeeProfile @relation(fields: [employeeProfileId], references: [id], onDelete: Cascade)
+  shift           Shift?          @relation(fields: [shiftId], references: [id])
+  location        Location        @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@index([locationId, clockInAt])
+}
+
+model Notification {
+  id           String           @id @default(cuid())
+  userId       String
+  type         NotificationType
+  title        String
+  body         String
+  readAt       DateTime?
+  channelsSent String[] // "push" | "sms" | "email"
+  createdAt    DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model PushDevice {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique // web-push subscription JSON / FCM token
+  platform  String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
