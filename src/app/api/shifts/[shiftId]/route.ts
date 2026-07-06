@@ -1,6 +1,8 @@
+import { auth } from "@/lib/auth";
 import { handleApiError, jsonErr, jsonOk } from "@/lib/api";
 import { prisma } from "@/lib/db";
 import { requireManagerForApi } from "@/lib/manager-guard";
+import { getEmployeeContext, getEmployeeShiftDetail } from "@/lib/queries/employee";
 import { getOrCreateSchedule, toScheduleShift } from "@/lib/schedule-data";
 import { updateShiftSchema } from "@/lib/shift-schemas";
 import {
@@ -10,6 +12,27 @@ import {
   toISODate,
   weekStartOfISO,
 } from "@/lib/time";
+
+export async function GET(
+  _request: Request,
+  ctx: { params: Promise<{ shiftId: string }> }
+) {
+  const { shiftId } = await ctx.params;
+  const session = await auth();
+  if (!session?.user) return jsonErr("unauthorized", "You need to sign in.", 401);
+
+  const viewer = await getEmployeeContext(session.user.id);
+  if (!viewer) {
+    return jsonErr("no_profile", "No employee profile is linked to this account.", 403);
+  }
+
+  const shift = await getEmployeeShiftDetail(
+    { profileId: viewer.profileId, locationId: viewer.locationId, timezone: viewer.timezone },
+    shiftId
+  );
+  if (!shift) return jsonErr("not_found", "Shift not found.", 404);
+  return jsonOk(shift);
+}
 
 export async function PATCH(
   req: Request,

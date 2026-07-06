@@ -1,6 +1,7 @@
 // src/lib/queries/employee.ts — read helpers shared by employee pages and /api/me/* routes.
 import { prisma } from "@/lib/db";
 import { formatShiftRange, shiftDurationHours } from "@/lib/time";
+import { formatDayFull } from "@/lib/time-format";
 
 export type EmployeeContext = {
   userId: string;
@@ -137,4 +138,86 @@ export async function getMyShifts(
   }));
   const totalHours = shifts.reduce((sum, s) => sum + s.durationHours, 0);
   return { shifts, summary: { shiftCount: shifts.length, totalHours } };
+}
+
+export type ShiftDetailDto = {
+  id: string;
+  date: string;
+  dayLabel: string; // "Mon Jul 6"
+  startsAt: string;
+  endsAt: string;
+  positionName: string;
+  isOpen: boolean;
+  timeRange: string;
+  durationHours: number;
+  notes: string | null;
+  location: { name: string; address: string | null; timezone: string };
+  coworkers: { name: string; positionName: string }[];
+};
+
+/**
+ * A shift an employee may see: their own published shift, or a published
+ * open shift at their location. Coworkers = other employees whose published
+ * shifts at the same location + service date overlap this one in time.
+ */
+export async function getEmployeeShiftDetail(
+  viewer: { profileId: string; locationId: string; timezone: string },
+  shiftId: string
+): Promise<ShiftDetailDto | null> {
+  const shift = await prisma.shift.findFirst({
+    where: {
+      id: shiftId,
+      status: "published",
+      OR: [
+        { employeeProfileId: viewer.profileId },
+        { employeeProfileId: null, locationId: viewer.locationId },
+      ],
+    },
+    include: { position: true, location: true },
+  });
+  if (!shift) return null;
+
+  const overlapping = await prisma.shift.findMany({
+    where: {
+      locationId: shift.locationId,
+      date: shift.date,
+      status: "published",
+      id: { not: shift.id },
+      employeeProfileId: { not: null },
+      NOT: { employeeProfileId: viewer.profileId },
+      startsAt: { lt: shift.endsAt },
+      endsAt: { gt: shift.startsAt },
+    },
+    include: { employeeProfile: { include: { user: true } }, position: true },
+    orderBy: { startsAt: "asc" },
+  });
+
+  const seen = new Set<string>();
+  const coworkers: { name: string; positionName: string }[] = [];
+  for (const s of overlapping) {
+    const p = s.employeeProfile;
+    if (!p || seen.has(p.id)) continue;
+    seen.add(p.id);
+    coworkers.push({ name: p.user.name, positionName: s.position.name });
+  }
+
+  const dateISO = shift.date.toISOString().slice(0, 10);
+  return {
+    id: shift.id,
+    date: dateISO,
+    dayLabel: formatDayFull(dateISO),
+    startsAt: shift.startsAt.toISOString(),
+    endsAt: shift.endsAt.toISOString(),
+    positionName: shift.position.name,
+    isOpen: shift.employeeProfileId === null,
+    timeRange: formatShiftRange(shift.startsAt, shift.endsAt, viewer.timezone),
+    durationHours: shiftDurationHours(shift.startsAt, shift.endsAt),
+    notes: shift.notes,
+    location: {
+      name: shift.location.name,
+      address: shift.location.address,
+      timezone: shift.location.timezone,
+    },
+    coworkers,
+  };
 }
