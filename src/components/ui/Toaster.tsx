@@ -39,6 +39,7 @@ export function ToasterProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<QueuedToast[]>([]);
   const [mounted, setMounted] = useState(false); // portal target exists only client-side
   const nextId = useRef(1);
+  const timeoutsRef = useRef<Set<number>>(new Set());
 
   useEffect(() => {
     // Client-only mount flag: guards `createPortal(..., document.body)` below
@@ -49,20 +50,36 @@ export function ToasterProvider({ children }: { children: React.ReactNode }) {
     setMounted(true);
   }, []);
 
+  // Clear any pending toast timers on unmount so they can't call setState
+  // on an unmounted provider.
+  useEffect(() => {
+    const timeouts = timeoutsRef.current;
+    return () => {
+      timeouts.forEach((id) => window.clearTimeout(id));
+      timeouts.clear();
+    };
+  }, []);
+
   const beginExit = useCallback((id: number) => {
     setToasts((ts) =>
       ts.map((t) => (t.id === id ? { ...t, leaving: true } : t))
     );
-    window.setTimeout(() => {
+    const timeoutId = window.setTimeout(() => {
+      timeoutsRef.current.delete(timeoutId);
       setToasts((ts) => ts.filter((t) => t.id !== id));
     }, TOAST_EXIT_MS);
+    timeoutsRef.current.add(timeoutId);
   }, []);
 
   const toast = useCallback(
     (input: ToastInput) => {
       const id = nextId.current++;
       setToasts((ts) => [...ts, { id, leaving: false, ...input }]);
-      window.setTimeout(() => beginExit(id), TOAST_DURATION_MS);
+      const timeoutId = window.setTimeout(() => {
+        timeoutsRef.current.delete(timeoutId);
+        beginExit(id);
+      }, TOAST_DURATION_MS);
+      timeoutsRef.current.add(timeoutId);
     },
     [beginExit]
   );

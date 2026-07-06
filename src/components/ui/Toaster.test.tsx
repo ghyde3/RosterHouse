@@ -101,4 +101,26 @@ describe("Toaster", () => {
       "useToast must be used inside <ToasterProvider>"
     );
   });
+
+  it("clears pending timers on unmount without erroring", () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { unmount } = render(
+      <ToasterProvider>
+        <Trigger />
+      </ToasterProvider>
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Fire toast" }));
+    // Unmount while the auto-dismiss timer is still pending.
+    act(() => {
+      vi.advanceTimersByTime(TOAST_DURATION_MS - 1);
+    });
+    unmount();
+    // Advance past both the auto-dismiss and exit timers; any orphaned
+    // timeout would call setState on the unmounted provider here.
+    act(() => {
+      vi.advanceTimersByTime(TOAST_DURATION_MS + TOAST_EXIT_MS);
+    });
+    expect(errorSpy).not.toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
 });
