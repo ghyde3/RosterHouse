@@ -1,0 +1,37 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-3);
+  padding: var(--space-9) var(--space-6);
+  font-family: var(--font-sans);
+}
+
+.iconWrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--surface-sunken);
+  color: var(--text-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--space-2);
+}
+
+.title {
+  font-size: var(--text-h3-size);
+  font-weight: var(--text-h3-weight);
+  color: var(--text-primary);
+}
+
+.description {
+  font-size: var(--text-body-sm-size);
+  color: var(--text-secondary);
+  max-width: 36ch;
+}
+
+.action {
+  margin-top: var(--space-3);
+}
