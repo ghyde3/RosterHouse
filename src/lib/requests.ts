@@ -92,3 +92,23 @@ export async function listDecidedTimeOff(locationId: string): Promise<TimeOffIte
   });
   return rows.map(toTimeOffItem);
 }
+
+export type Coworker = { profileId: string; name: string };
+
+export async function listQualifiedCoworkers(
+  locationId: string,
+  positionId: string,
+  excludeProfileId: string,
+): Promise<Coworker[]> {
+  const rows = await prisma.employeeProfile.findMany({
+    where: {
+      locationId,
+      status: "active",
+      id: { not: excludeProfileId },
+      positions: { some: { positionId } },
+    },
+    include: { user: true },
+    orderBy: { user: { name: "asc" } },
+  });
+  return rows.map((r) => ({ profileId: r.id, name: r.user.name }));
+}
