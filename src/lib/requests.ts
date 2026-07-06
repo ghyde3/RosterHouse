@@ -152,3 +152,79 @@ export async function listOpenShiftsForEmployee(employeeProfileId: string): Prom
     };
   });
 }
+
+export type MyRequestItem = {
+  id: string;
+  kind: "swap" | "claim";
+  label: string;
+  detail: string;
+  status: RequestStatus;
+  createdAt: string;
+};
+
+export async function listMyRequests(employeeProfileId: string): Promise<MyRequestItem[]> {
+  const profile = await prisma.employeeProfile.findUniqueOrThrow({
+    where: { id: employeeProfileId },
+    include: { location: true },
+  });
+  const tz = profile.location.timezone;
+  const [swaps, claims] = await Promise.all([
+    prisma.swapRequest.findMany({
+      where: { requestingEmployeeProfileId: employeeProfileId },
+      include: { shift: { include: { position: true } }, coverer: { include: { user: true } } },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.openShiftClaim.findMany({
+      where: { employeeProfileId },
+      include: { shift: { include: { position: true } } },
+      orderBy: { createdAt: "desc" },
+    }),
+  ]);
+  const items: MyRequestItem[] = [
+    ...swaps.map((r) => ({
+      id: r.id,
+      kind: "swap" as const,
+      label: `Swap · ${formatMediumDate(isoDateOf(r.shift.date))} ${r.shift.position.name}`,
+      detail: r.coverer ? `Asked ${r.coverer.user.name} to cover` : "Open to anyone qualified",
+      status: r.status,
+      createdAt: r.createdAt.toISOString(),
+    })),
+    ...claims.map((c) => ({
+      id: c.id,
+      kind: "claim" as const,
+      label: `Claim · ${formatMediumDate(isoDateOf(c.shift.date))} ${c.shift.position.name}`,
+      detail: formatShiftRange(c.shift.startsAt, c.shift.endsAt, tz),
+      status: c.status,
+      createdAt: c.createdAt.toISOString(),
+    })),
+  ];
+  return items.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export type SwappableShift = {
+  shiftId: string;
+  dayLabel: string;
+  positionName: string;
+  timeLabel: string;
+  hasPendingSwap: boolean;
+};
+
+export async function listMyUpcomingShifts(employeeProfileId: string, limit = 5): Promise<SwappableShift[]> {
+  const profile = await prisma.employeeProfile.findUniqueOrThrow({
+    where: { id: employeeProfileId },
+    include: { location: true },
+  });
+  const shifts = await prisma.shift.findMany({
+    where: { employeeProfileId, status: "published", startsAt: { gt: new Date() } },
+    include: { position: true, swapRequests: { where: { status: "pending" } } },
+    orderBy: { startsAt: "asc" },
+    take: limit,
+  });
+  return shifts.map((s) => ({
+    shiftId: s.id,
+    dayLabel: formatMediumDate(isoDateOf(s.date)),
+    positionName: s.position.name,
+    timeLabel: formatShiftRange(s.startsAt, s.endsAt, profile.location.timezone),
+    hasPendingSwap: s.swapRequests.length > 0,
+  }));
+}
