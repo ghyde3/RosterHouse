@@ -122,4 +122,9 @@ Drag-and-drop scheduling (click-to-assign is the designed interaction; DnD
 is a later enhancement), billing, payroll/POS/reporting (phase 3),
 multi-location switcher UI (modeled in schema, single location in UI),
 PWA/offline/push delivery (phase 2), SMS provider hookup (interface ready,
-driver stubbed), manager mobile responsiveness (fixed rail per design).
+console driver by default; an optional Twilio driver may ship env-gated and
+disabled by default, but real SMS stays off until consent exists — see
+next), SMS consent capture + phone verification (TCPA — required before
+enabling any real SMS driver), timesheet/punch-history views
+(TimeClockEntry rows are recorded; the review UI is a follow-up), manager
+mobile responsiveness (fixed rail per design).
