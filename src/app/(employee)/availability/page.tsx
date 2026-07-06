@@ -1,12 +1,19 @@
+import { requireUser } from "@/lib/auth";
+import { getEmployeeContext, getMyAvailability } from "@/lib/queries/employee";
 import { PageTopBar } from "@/components/employee/PageTopBar";
-import { EmptyState } from "@/components/ui/EmptyState";
+import { AvailabilityEditor } from "./AvailabilityEditor";
 import styles from "@/components/employee/employee.module.css";
 
-export default function AvailabilityPage() {
+export default async function AvailabilityPage() {
+  const user = await requireUser();
+  const ctx = await getEmployeeContext(user.id);
+  if (!ctx) throw new Error("No employee profile is linked to this account.");
+  const rules = await getMyAvailability(ctx.profileId);
+
   return (
     <div className={styles.screen}>
       <PageTopBar title="Availability" />
-      <EmptyState title="Availability editing is coming soon" description="This screen is being built." />
+      <AvailabilityEditor initialRules={rules} />
     </div>
   );
 }

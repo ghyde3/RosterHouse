@@ -221,3 +221,29 @@ export async function getEmployeeShiftDetail(
     coworkers,
   };
 }
+
+export type AvailabilityRuleDto = {
+  dayOfWeek: number; // 0=Mon..6=Sun
+  isAvailable: boolean;
+  startTime: string | null; // "09:00" location-local 24-hour; null = all day
+  endTime: string | null;
+};
+
+/** Always exactly 7 rules, dayOfWeek 0..6; missing days default to available all day. */
+export async function getMyAvailability(profileId: string): Promise<AvailabilityRuleDto[]> {
+  const rows = await prisma.availabilityRule.findMany({
+    where: { employeeProfileId: profileId },
+  });
+  const byDay = new Map(rows.map((r) => [r.dayOfWeek, r]));
+  const rules: AvailabilityRuleDto[] = [];
+  for (let d = 0; d < 7; d++) {
+    const rule = byDay.get(d);
+    rules.push({
+      dayOfWeek: d,
+      isAvailable: rule ? rule.isAvailable : true,
+      startTime: rule?.startTime ?? null,
+      endTime: rule?.endTime ?? null,
+    });
+  }
+  return rules;
+}
