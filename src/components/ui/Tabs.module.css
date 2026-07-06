@@ -1,0 +1,33 @@
+.tablist {
+  display: flex;
+  gap: 4px;
+  background: var(--surface-sunken);
+  padding: 4px;
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  width: fit-content;
+}
+
+.tab {
+  padding: 8px 16px;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: var(--text-label-size);
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: transparent;
+  cursor: pointer;
+  transition: background var(--duration-base) var(--ease-out);
+}
+
+.tab:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
+.tab[aria-selected="true"] {
+  color: var(--text-brand);
+  background: var(--surface-card);
+  box-shadow: var(--shadow-sm);
+}
