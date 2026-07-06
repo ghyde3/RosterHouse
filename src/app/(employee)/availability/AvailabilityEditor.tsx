@@ -8,9 +8,7 @@ import { Switch } from "@/components/ui/Switch";
 import { Tabs } from "@/components/ui/Tabs";
 import { TimeField } from "@/components/ui/TimeField";
 import { Sheet } from "@/components/ui/Sheet";
-import { Tooltip } from "@/components/ui/Tooltip";
 import { useToast } from "@/components/ui/Toaster";
-import { TIME_OFF_ENABLED } from "@/lib/flags";
 import type { AvailabilityRuleDto } from "@/lib/queries/employee";
 import { DAY_NAMES, editorReducer, initEditor, toDto } from "./reducer";
 import s from "./availability.module.css";
@@ -172,15 +170,6 @@ export function AvailabilityEditor({ initialRules }: { initialRules: Availabilit
             ))}
           </div>
         </Card>
-      )}
-
-      {/* Phase 5 replaces this with the real time-off request dialog. */}
-      {!TIME_OFF_ENABLED && (
-        <Tooltip label="Coming soon">
-          <Button variant="secondary" fullWidth disabled>
-            Request time off
-          </Button>
-        </Tooltip>
       )}
 
       <div className={s.saveBar}>
