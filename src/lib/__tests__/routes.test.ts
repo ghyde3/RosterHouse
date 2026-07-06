@@ -12,6 +12,7 @@ describe("isPublicPath", () => {
     expect(isPublicPath("/forgot-password")).toBe(true);
     expect(isPublicPath("/invite/some-token-123")).toBe(true);
     expect(isPublicPath("/design-system")).toBe(true);
+    expect(isPublicPath("/signout-stale")).toBe(true);
   });
 
   it("does not allow app pages", () => {

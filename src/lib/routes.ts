@@ -1,6 +1,6 @@
 type RouteUser = { role: "manager" | "employee" };
 
-const PUBLIC_PATHS = ["/login", "/signup", "/forgot-password", "/design-system"];
+const PUBLIC_PATHS = ["/login", "/signup", "/forgot-password", "/design-system", "/signout-stale"];
 const EMPLOYEE_PREFIXES = ["/shifts", "/availability", "/clock", "/swaps", "/notifications", "/profile"];
 
 function matchesPrefix(pathname: string, prefix: string): boolean {

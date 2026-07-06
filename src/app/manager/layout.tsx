@@ -1,11 +1,27 @@
+import { redirect } from "next/navigation";
 import { requireManager } from "@/lib/auth";
 import { getManagerLocation } from "@/lib/authz";
+import { ApiError } from "@/lib/api";
 import { ManagerSidebar } from "@/components/chrome/ManagerSidebar";
 import { ToasterProvider } from "@/components/ui/Toaster";
 
 export default async function ManagerLayout({ children }: { children: React.ReactNode }) {
   const user = await requireManager();
-  const location = await getManagerLocation(user.id);
+
+  let location;
+  try {
+    location = await getManagerLocation(user.id);
+  } catch (err) {
+    // A validly-signed session can outlive its user row (e.g. every
+    // `prisma db seed` deletes + recreates the org). Route to a handler
+    // that actually clears the cookie — redirect("/login") here would
+    // leave the "valid" JWT in place and middleware would bounce it
+    // straight back to /manager, looping forever.
+    if (err instanceof ApiError && err.status === 401) {
+      redirect("/signout-stale");
+    }
+    throw err;
+  }
 
   return (
     <ToasterProvider>
