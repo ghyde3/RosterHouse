@@ -99,6 +99,7 @@ model Location {
   shifts       Shift[]
   invites      Invite[]
   clockEntries TimeClockEntry[]
+  scheduleTemplates ScheduleTemplate[]
 }
 
 model User {
@@ -142,6 +143,7 @@ model EmployeeProfile {
   swapsCovering   SwapRequest[]      @relation("SwapCoverer")
   openShiftClaims OpenShiftClaim[]
   clockEntries    TimeClockEntry[]
+  templateRows    ScheduleTemplateRow[]
 
   @@unique([userId, locationId])
 }
@@ -192,6 +194,7 @@ model Position {
   employees        EmployeePosition[]
   primaryFor       EmployeeProfile[]  @relation("PrimaryPosition")
   invites          Invite[]
+  templateRows     ScheduleTemplateRow[]
 
   @@unique([locationId, name])
 }
@@ -342,4 +345,34 @@ model PushDevice {
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ScheduleTemplate {
+  id         String   @id @default(cuid())
+  locationId String
+  name       String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  location Location              @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  rows     ScheduleTemplateRow[]
+
+  @@unique([locationId, name])
+}
+
+model ScheduleTemplateRow {
+  id                String  @id @default(cuid())
+  templateId        String
+  positionId        String
+  employeeProfileId String? // remembered default assignee; null = open slot
+  dayOfWeek         Int // 0=Mon..6=Sun
+  startTime         String // wall-clock, location-local, 12h ("7:00 AM")
+  endTime           String
+  notes             String?
+
+  template        ScheduleTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  position        Position         @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  employeeProfile EmployeeProfile? @relation(fields: [employeeProfileId], references: [id], onDelete: SetNull)
+
+  @@index([templateId])
 }
