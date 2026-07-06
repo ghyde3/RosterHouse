@@ -8,6 +8,7 @@ import AssignShiftDialog, {
 } from "@/components/schedule/AssignShiftDialog";
 import DayList from "@/components/schedule/DayList";
 import MonthGrid from "@/components/schedule/MonthGrid";
+import PublishDialog from "@/components/schedule/PublishDialog";
 import WeekGrid from "@/components/schedule/WeekGrid";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -61,6 +62,7 @@ export default function ScheduleView({
   const router = useRouter();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogInitial, setDialogInitial] = useState<AssignShiftDialogInitial | null>(null);
+  const [publishOpen, setPublishOpen] = useState(false);
 
   function buildUrl(next: Partial<{ view: string; week: ISODate; day: ISODate; month: string }>): string {
     const nextView = next.view ?? view;
@@ -163,6 +165,11 @@ export default function ScheduleView({
           <Button variant="secondary" onClick={() => openAdd(null, null)}>
             Add shift
           </Button>
+          {(data.schedule.status === "draft" || isRepublish) && (
+            <Button variant="primary" onClick={() => setPublishOpen(true)}>
+              {isRepublish ? "Publish changes" : "Publish schedule"}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -220,6 +227,14 @@ export default function ScheduleView({
         employees={employees}
         initial={dialogInitial}
         onClose={() => setDialogOpen(false)}
+      />
+
+      <PublishDialog
+        open={publishOpen}
+        scheduleId={data.schedule.id}
+        employeeCount={data.assignedEmployeeCount}
+        isRepublish={isRepublish}
+        onClose={() => setPublishOpen(false)}
       />
     </div>
   );

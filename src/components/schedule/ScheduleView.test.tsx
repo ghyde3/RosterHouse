@@ -59,6 +59,50 @@ describe("ScheduleView header", () => {
     fireEvent.click(screen.getByText("Add shift"));
     expect(screen.getByText("Assign shift")).toBeTruthy(); // dialog title
   });
+
+  it("draft week shows the publish button with the assigned count in the dialog", () => {
+    render(<ScheduleView {...baseProps} data={weekData({ assignedEmployeeCount: 3 })} />);
+    fireEvent.click(screen.getByText("Publish schedule"));
+    expect(screen.getByText("Publish this week's schedule?")).toBeTruthy();
+    expect(screen.getByText("3 employees will be notified.")).toBeTruthy();
+  });
+
+  it("published week with unpublished changes relabels the button", () => {
+    render(
+      <ScheduleView
+        {...baseProps}
+        data={weekData({
+          schedule: {
+            id: "sched-1",
+            status: "published",
+            publishedAt: "2026-07-01T12:00:00.000Z",
+            hasUnpublishedChanges: true,
+          },
+        })}
+      />,
+    );
+    expect(screen.getByText("Unpublished changes")).toBeTruthy();
+    expect(screen.getByText("Publish changes")).toBeTruthy();
+  });
+
+  it("published week with no changes shows no publish button", () => {
+    render(
+      <ScheduleView
+        {...baseProps}
+        data={weekData({
+          schedule: {
+            id: "sched-1",
+            status: "published",
+            publishedAt: "2026-07-01T12:00:00.000Z",
+            hasUnpublishedChanges: false,
+          },
+        })}
+      />,
+    );
+    expect(screen.getByText("Published")).toBeTruthy();
+    expect(screen.queryByText("Publish schedule")).toBeNull();
+    expect(screen.queryByText("Publish changes")).toBeNull();
+  });
 });
 
 describe("ScheduleView navigation", () => {
