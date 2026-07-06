@@ -1,12 +1,48 @@
+import { requireUser } from "@/lib/auth";
+import { getEmployeeContext } from "@/lib/queries/employee";
 import { PageTopBar } from "@/components/employee/PageTopBar";
-import { EmptyState } from "@/components/ui/EmptyState";
+import { Avatar } from "@/components/ui/Avatar";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { NotificationPrefs } from "./NotificationPrefs";
+import { logOut } from "./actions";
 import styles from "@/components/employee/employee.module.css";
 
-export default function ProfilePage() {
+export default async function ProfilePage() {
+  const user = await requireUser();
+  const ctx = await getEmployeeContext(user.id);
+  if (!ctx) throw new Error("No employee profile is linked to this account.");
+
   return (
     <div className={styles.screen}>
       <PageTopBar title="Profile" />
-      <EmptyState title="Your profile is coming soon" description="This screen is being built." />
+
+      <Card>
+        <div className={styles.profileRow}>
+          <Avatar name={ctx.name} size={52} />
+          <div>
+            <div className={styles.shiftTitle}>{ctx.name}</div>
+            <div className={styles.muted}>
+              {[ctx.primaryPositionName, ctx.locationName].filter(Boolean).join(" · ")}
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      <h2 className={styles.sectionTitle}>Notification preferences</h2>
+      <NotificationPrefs
+        initial={{
+          notifyPush: ctx.notifyPush,
+          notifySms: ctx.notifySms,
+          notifyEmail: ctx.notifyEmail,
+        }}
+      />
+
+      <form action={logOut}>
+        <Button variant="ghost" fullWidth type="submit">
+          Log out
+        </Button>
+      </form>
     </div>
   );
 }
