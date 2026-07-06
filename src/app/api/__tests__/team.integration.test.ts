@@ -18,6 +18,8 @@ let profileId: string;
 let serverPositionId: string;
 let hostPositionId: string;
 let foreignPositionId: string;
+let orgId2: string;
+let managerId2: string;
 
 function asManager() {
   apiUserMock.mockResolvedValue({ id: managerId, name: "Manager", role: "manager", organizationId: orgId });
@@ -69,10 +71,18 @@ beforeAll(async () => {
   });
   profileId = profile.id;
   await prisma.employeePosition.create({ data: { employeeProfileId: profile.id, positionId: serverPositionId } });
+
+  // Second org for cross-org tests
+  const org2 = await prisma.organization.create({ data: { name: `Team Org 2 ${suffix}` } });
+  orgId2 = org2.id;
+  const manager2 = await prisma.user.create({
+    data: { organizationId: org2.id, name: "Manager 2", email: `tm2-${Date.now()}@test.local`, passwordHash, role: "manager" },
+  });
+  managerId2 = manager2.id;
 });
 
 afterAll(async () => {
-  await prisma.organization.deleteMany({ where: { id: orgId } });
+  await prisma.organization.deleteMany({ where: { id: { in: [orgId, orgId2] } } });
   await prisma.$disconnect();
 });
 
@@ -160,5 +170,16 @@ describe("PATCH /api/employee-profiles/[id]", () => {
       params({ id: "nope" }),
     );
     expect(res.status).toBe(404);
+  });
+
+  it("403s when a manager from another org attempts to patch", async () => {
+    apiUserMock.mockResolvedValue({ id: managerId2, name: "Manager 2", role: "manager", organizationId: orgId2 });
+    const res = await patchProfile(
+      jsonPatch(`http://test.local/api/employee-profiles/${profileId}`, { status: "inactive" }),
+      params({ id: profileId }),
+    );
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error.code).toBe("forbidden");
   });
 });

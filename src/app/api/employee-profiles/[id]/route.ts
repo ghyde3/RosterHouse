@@ -4,6 +4,7 @@ import { apiUser } from "@/lib/auth";
 import { assertLocationMember } from "@/lib/authz";
 import { prisma } from "@/lib/db";
 import { getTeam } from "@/lib/team";
+import { Prisma } from "@/generated/prisma/client";
 
 const patchSchema = z.object({
   primaryPositionId: z.string().nullable().optional(),
@@ -77,6 +78,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const member = members.find((m) => m.id === id);
     return jsonOk({ member });
   } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      return jsonErr("conflict", "That change collided with another update. Try again.", 409);
+    }
     return handleApiError(err);
   }
 }
