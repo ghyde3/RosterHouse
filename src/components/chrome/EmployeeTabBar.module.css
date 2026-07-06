@@ -1,0 +1,30 @@
+.bar {
+  display: flex;
+  border-top: 1px solid var(--border-default);
+  background: var(--surface-card);
+  padding: 8px 4px 14px;
+  font-family: var(--font-sans);
+}
+
+.tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-tertiary);
+  text-decoration: none;
+  font-size: 10.5px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  padding: 4px 0;
+}
+
+.tab:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
+.tabActive {
+  color: var(--text-brand);
+}

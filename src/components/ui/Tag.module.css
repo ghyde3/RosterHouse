@@ -1,0 +1,46 @@
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: var(--text-body-sm-size);
+  font-weight: 500;
+}
+
+.tag[data-color="neutral"] {
+  background: var(--surface-sunken);
+  color: var(--text-primary);
+}
+.tag[data-color="brand"] {
+  background: var(--surface-brand-soft);
+  color: var(--text-brand);
+}
+.tag[data-color="accent"] {
+  background: var(--amber-100);
+  color: var(--amber-800);
+}
+
+.remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  opacity: 0.6;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.remove:hover {
+  opacity: 1;
+}
+
+.remove:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+  opacity: 1;
+}
