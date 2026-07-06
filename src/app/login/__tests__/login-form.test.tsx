@@ -54,4 +54,16 @@ describe("LoginForm", () => {
       redirect: false,
     });
   });
+
+  it("recovers the form when signIn rejects", async () => {
+    signInMock.mockRejectedValue(new Error("network down"));
+    render(<LoginForm />);
+    fillAndSubmit("maria@harborvine.test", "rosterhouse1");
+
+    expect(await screen.findByText("Something went wrong — try again.")).toBeTruthy();
+
+    const button = screen.getByRole("button", { name: "Log in" }) as HTMLButtonElement;
+    expect(button.disabled).toBe(false);
+    expect(assignMock).not.toHaveBeenCalled();
+  });
 });

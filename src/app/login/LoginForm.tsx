@@ -20,20 +20,26 @@ export function LoginForm() {
       return;
     }
     setSubmitting(true);
-    const res = await signIn("credentials", {
-      identifier: identifier.trim(),
-      password,
-      redirect: false,
-    });
-    if (res?.error) {
+    try {
+      const res = await signIn("credentials", {
+        identifier: identifier.trim(),
+        password,
+        redirect: false,
+      });
+      if (res?.error) {
+        setSubmitting(false);
+        setError("That phone/email or password doesn't match.");
+        return;
+      }
+      // Middleware redirects signed-in users from "/" to their home (manager
+      // → "/manager", employee → "/shifts"); a full navigation makes sure the
+      // new session cookie is picked up. Submitting stays true so the button
+      // doesn't flash back to enabled before the navigation happens.
+      window.location.assign("/");
+    } catch {
       setSubmitting(false);
-      setError("That phone/email or password doesn't match.");
-      return;
+      setError("Something went wrong — try again.");
     }
-    // Middleware redirects signed-in users from "/" to their home (manager
-    // → "/manager", employee → "/shifts"); a full navigation makes sure the
-    // new session cookie is picked up.
-    window.location.assign("/");
   }
 
   return (
@@ -65,12 +71,8 @@ export function LoginForm() {
           placeholder="••••••••"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          error={error ?? undefined}
         />
-        {error && (
-          <p role="alert" style={{ fontSize: 13, color: "var(--status-danger)" }}>
-            {error}
-          </p>
-        )}
         <Button variant="primary" size="lg" fullWidth type="submit" disabled={submitting}>
           {submitting ? "Logging in…" : "Log in"}
         </Button>
