@@ -8,7 +8,9 @@ import {
   listTemplates,
   updateTemplate,
 } from "@/lib/template-data";
-import { createFixture, destroyFixture, type Fixture } from "./helpers/factory";
+import { createFixture, createShiftAt, destroyFixture, type Fixture } from "./helpers/factory";
+import { addDaysISO, localToUtc, weekStartOf } from "@/lib/time";
+import { snapshotWeekToRows } from "@/lib/template-data";
 
 let f: Fixture;
 
@@ -105,5 +107,53 @@ describe("updateTemplate / deleteTemplate", () => {
     expect(await deleteTemplate(f.locationId, created.id)).toBe(true);
     expect(await getTemplateDetail(f.locationId, created.id)).toBeNull();
     expect(await deleteTemplate(f.locationId, created.id)).toBe(false);
+  });
+});
+
+describe("snapshotWeekToRows", () => {
+  it("relativizes a week's shifts: open shifts, assignments, and cross-midnight", async () => {
+    const week = weekStartOf(new Date(), f.timezone); // Monday ISODate
+    // Mon 7:00 AM – 3:00 PM, assigned to Ana
+    await createShiftAt(f, {
+      positionId: f.positionIds.server,
+      employeeProfileId: f.ana.profileId,
+      startsAt: localToUtc(week, { hour: 7, minute: 0 }, f.timezone),
+      endsAt: localToUtc(week, { hour: 15, minute: 0 }, f.timezone),
+    });
+    // Wed 9:00 AM – 5:00 PM, OPEN
+    const wed = addDaysISO(week, 2);
+    await createShiftAt(f, {
+      positionId: f.positionIds.dishwasher,
+      employeeProfileId: null,
+      startsAt: localToUtc(wed, { hour: 9, minute: 0 }, f.timezone),
+      endsAt: localToUtc(wed, { hour: 17, minute: 0 }, f.timezone),
+    });
+    // Fri 8:00 PM – 2:00 AM (crosses midnight), assigned to Ben
+    const fri = addDaysISO(week, 4);
+    await createShiftAt(f, {
+      positionId: f.positionIds.server,
+      employeeProfileId: f.ben.profileId,
+      startsAt: localToUtc(fri, { hour: 20, minute: 0 }, f.timezone),
+      endsAt: localToUtc(addDaysISO(fri, 1), { hour: 2, minute: 0 }, f.timezone),
+    });
+
+    const rows = await snapshotWeekToRows(f.locationId, week);
+    expect(rows).toHaveLength(3);
+
+    const mon = rows.find((r) => r.dayOfWeek === 0)!;
+    expect(mon).toMatchObject({
+      positionId: f.positionIds.server,
+      employeeProfileId: f.ana.profileId,
+      startTime: "7:00 AM",
+      endTime: "3:00 PM",
+    });
+
+    const wedRow = rows.find((r) => r.dayOfWeek === 2)!;
+    expect(wedRow.employeeProfileId).toBeNull();
+    expect(wedRow.startTime).toBe("9:00 AM");
+
+    const friRow = rows.find((r) => r.dayOfWeek === 4)!;
+    expect(friRow.employeeProfileId).toBe(f.ben.profileId);
+    expect(friRow).toMatchObject({ startTime: "8:00 PM", endTime: "2:00 AM" });
   });
 });

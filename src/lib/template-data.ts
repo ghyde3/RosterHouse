@@ -2,7 +2,15 @@ import { ApiError } from "@/lib/api";
 import { prisma } from "@/lib/db";
 import { Prisma } from "@/generated/prisma/client";
 import type { TemplateRowInput } from "@/lib/template-schemas";
-import { parseTime12h } from "@/lib/time";
+import { getOrCreateSchedule, getScheduleWeekData } from "@/lib/schedule-data";
+import {
+  addDaysISO,
+  dayOfWeekMon0,
+  parseTime12h,
+  shiftInstants,
+  weekStartOfISO,
+  type ISODate,
+} from "@/lib/time";
 
 export type TemplateRow = {
   id: string;
@@ -142,4 +150,22 @@ export async function deleteTemplate(locationId: string, templateId: string): Pr
   if (!existing) return false;
   await prisma.scheduleTemplate.delete({ where: { id: templateId } });
   return true;
+}
+
+export async function snapshotWeekToRows(
+  locationId: string,
+  fromWeek: ISODate,
+): Promise<TemplateRowInput[]> {
+  const data = await getScheduleWeekData(locationId, weekStartOfISO(fromWeek));
+  return data.shifts.map((s) => {
+    const [startTime, endTime] = s.timeRange.split(" – ");
+    return {
+      positionId: s.positionId,
+      employeeProfileId: s.employeeProfileId,
+      dayOfWeek: dayOfWeekMon0(s.date),
+      startTime,
+      endTime,
+      notes: s.notes,
+    };
+  });
 }
