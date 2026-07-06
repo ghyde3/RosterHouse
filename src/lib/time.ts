@@ -1,5 +1,5 @@
 import { TZDate } from "@date-fns/tz";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 
 export type ISODate = string; // "2026-07-06" (calendar date, no timezone)
 export type TimeOfDay = { hour: number; minute: number }; // 24-hour clock
@@ -136,4 +136,17 @@ export function formatDateShort(d: ISODate): string {
 export function formatFullDate(d: ISODate): string {
   const [y, m, day] = partsOf(d);
   return format(new Date(y, m - 1, day), "EEEE, MMMM d");
+}
+
+// --- Calendar-date labels (Phase 5) ------------------------------------
+// These format pure calendar dates (ISODate strings), so no timezone is
+// involved — parseISO gives local midnight and format reads it back out.
+
+export function formatMediumDate(d: ISODate): string {
+  return format(parseISO(d), "EEE MMM d"); // "Sat Jul 12"
+}
+
+export function formatDateRange(start: ISODate, end: ISODate): string {
+  const label = (x: ISODate) => format(parseISO(x), "MMM d");
+  return start === end ? label(start) : `${label(start)} – ${label(end)}`;
 }
