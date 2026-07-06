@@ -126,4 +126,45 @@ describe("PATCH /api/swap-requests/[id]", () => {
     expect(res.status).toBe(409);
     expect((await res.json()).error.code).toBe("already_decided");
   });
+
+  it("returns 409 with a calm envelope if the shift was reassigned mid-flight, without reassigning it", async () => {
+    // The route's pre-check (before the transaction) already catches a shift
+    // that visibly changed by the time it re-fetches the request — that's
+    // covered implicitly elsewhere. This test targets the *narrower* race the
+    // guarded `tx.shift.updateMany` exists for: the shift changes in the
+    // window between the route's read and the transaction's write. We
+    // reproduce that window by stubbing the initial `findUnique` to return
+    // stale data (as if read a moment before a concurrent change lands),
+    // while the real row underneath has already moved to Cal.
+    const { shift, request } = await makeSwap(f, { covererProfileId: f.ben.profileId, daysFromNow: 10 });
+    const staleRequest = await prisma.swapRequest.findUniqueOrThrow({
+      where: { id: request.id },
+      include: {
+        shift: { include: { position: true, location: true } },
+        requester: { include: { user: true } },
+        coverer: { include: { user: true } },
+      },
+    });
+    await prisma.shift.update({ where: { id: shift.id }, data: { employeeProfileId: f.cal.profileId } });
+
+    const spy = vi.spyOn(prisma.swapRequest, "findUnique").mockResolvedValueOnce(staleRequest as never);
+    signInAs(f.managerUserId, { role: "manager", organizationId: f.orgId });
+    const res = await PATCH(...patchReq(request.id, "approve"));
+    spy.mockRestore();
+
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.error.code).toBe("shift_changed");
+    expect(body.error.message).toBe("That shift changed before you could approve. Refresh and try again.");
+
+    // The shift must remain assigned to whoever it was reassigned to — the
+    // guarded update must not have clobbered it.
+    const unchanged = await prisma.shift.findUniqueOrThrow({ where: { id: shift.id } });
+    expect(unchanged.employeeProfileId).toBe(f.cal.profileId);
+
+    // The swap request itself must not be left "approved" with a shift that
+    // disagrees — the whole transaction should have rolled back.
+    const requestAfter = await prisma.swapRequest.findUniqueOrThrow({ where: { id: request.id } });
+    expect(requestAfter.status).toBe("pending");
+  });
 });

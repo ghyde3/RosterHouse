@@ -135,4 +135,52 @@ describe("PATCH /api/open-shift-claims/[claimId]", () => {
     expect(res.status).toBe(409);
     expect((await res.json()).error.code).toBe("already_filled");
   });
+
+  it("returns 409 with a calm envelope if the shift was filled mid-flight, without reassigning it", async () => {
+    // The route's pre-check (before the transaction) already catches a shift
+    // that's visibly filled by the time it re-fetches the claim — that's the
+    // "already_filled" case above. This test targets the *narrower* race the
+    // guarded `tx.shift.updateMany` exists for: the shift gets filled in the
+    // window between the route's read and the transaction's write. We
+    // reproduce that window by stubbing the initial `findUnique` to return
+    // stale (still-open) data, while the real row underneath already has a
+    // different assignee.
+    const open = await createShift(f, {
+      positionId: f.positionIds.server,
+      employeeProfileId: null,
+      daysFromNow: 10,
+      startHour: 9,
+      endHour: 17,
+    });
+    const claim = await prisma.openShiftClaim.create({ data: { shiftId: open.id, employeeProfileId: f.ana.profileId } });
+    const staleClaim = await prisma.openShiftClaim.findUniqueOrThrow({
+      where: { id: claim.id },
+      include: {
+        shift: { include: { position: true, location: true } },
+        employeeProfile: { include: { user: true } },
+      },
+    });
+    await prisma.shift.update({ where: { id: open.id }, data: { employeeProfileId: f.cal.profileId } });
+
+    const spy = vi.spyOn(prisma.openShiftClaim, "findUnique").mockResolvedValueOnce(staleClaim as never);
+    signInAs(f.managerUserId, { role: "manager", organizationId: f.orgId });
+    const res = await PATCH(...patchReq(claim.id, "approve"));
+    spy.mockRestore();
+
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.error.code).toBe("shift_changed");
+    expect(body.error.message).toBe("That shift changed before you could approve. Refresh and try again.");
+
+    // The shift must remain assigned to whoever filled it — the guarded
+    // update must not have clobbered it.
+    const unchanged = await prisma.shift.findUniqueOrThrow({ where: { id: open.id } });
+    expect(unchanged.employeeProfileId).toBe(f.cal.profileId);
+
+    // The claim itself must not be left "approved" against a shift that
+    // disagrees, and no competing claims should have been auto-denied —
+    // the whole transaction should have rolled back.
+    const claimAfter = await prisma.openShiftClaim.findUniqueOrThrow({ where: { id: claim.id } });
+    expect(claimAfter.status).toBe("pending");
+  });
 });

@@ -12,6 +12,9 @@ import { isoDateOf } from "@/lib/requests";
 
 const decisionSchema = z.object({ decision: z.enum(["approve", "deny"]) });
 
+/** Signals the guarded shift reassignment missed — used to roll back the transaction. */
+class ShiftChangedError extends Error {}
+
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const body = await req.json().catch(() => null);
@@ -43,21 +46,37 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   }
 
   const status = decision === "approve" ? "approved" : "denied";
-  const decided = await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const updated = await tx.swapRequest.updateMany({
       where: { id, status: "pending" },
       data: { status, decidedByUserId: user.id, decidedAt: new Date() },
     });
-    if (updated.count === 0) return false;
+    if (updated.count === 0) return "already_decided" as const;
     if (decision === "approve") {
-      await tx.shift.update({
-        where: { id: request.shiftId },
+      // Guard the reassignment on the shift still being assigned to the
+      // requester — a concurrent approval or manual PATCH could have moved
+      // it since we read `request` above. If it doesn't match, roll back.
+      const reassigned = await tx.shift.updateMany({
+        where: { id: request.shiftId, employeeProfileId: request.requestingEmployeeProfileId },
         data: { employeeProfileId: request.coveringEmployeeProfileId },
       });
+      if (reassigned.count === 0) {
+        throw new ShiftChangedError();
+      }
     }
-    return true;
+    return "decided" as const;
+  }).catch((err) => {
+    if (err instanceof ShiftChangedError) return "shift_changed" as const;
+    throw err;
   });
-  if (!decided) return jsonErr("already_decided", "This request was already decided.", 409);
+  if (result === "already_decided") return jsonErr("already_decided", "This request was already decided.", 409);
+  if (result === "shift_changed") {
+    return jsonErr(
+      "shift_changed",
+      "That shift changed before you could approve. Refresh and try again.",
+      409,
+    );
+  }
 
   const timezone = request.shift.location.timezone;
   const shiftLabel = `${formatMediumDate(isoDateOf(request.shift.date))} ${request.shift.position.name} shift, ${formatShiftRange(

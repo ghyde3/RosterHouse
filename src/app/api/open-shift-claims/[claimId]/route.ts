@@ -12,6 +12,9 @@ import { isoDateOf } from "@/lib/requests";
 
 const decisionSchema = z.object({ decision: z.enum(["approve", "deny"]) });
 
+/** Signals the guarded shift reassignment missed — used to roll back the transaction. */
+class ShiftChangedError extends Error {}
+
 export async function PATCH(req: Request, ctx: { params: Promise<{ claimId: string }> }) {
   const { claimId } = await ctx.params;
   const body = await req.json().catch(() => null);
@@ -44,12 +47,12 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ claimId: stri
   const status = decision === "approve" ? "approved" : "denied";
   const now = new Date();
   let competingUserIds: string[] = [];
-  const decided = await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const updated = await tx.openShiftClaim.updateMany({
       where: { id: claimId, status: "pending" },
       data: { status, decidedByUserId: user.id, decidedAt: now },
     });
-    if (updated.count === 0) return false;
+    if (updated.count === 0) return "already_decided" as const;
     if (decision === "approve") {
       const competing = await tx.openShiftClaim.findMany({
         where: { shiftId: claim.shiftId, status: "pending", id: { not: claimId } },
@@ -60,14 +63,30 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ claimId: stri
         where: { shiftId: claim.shiftId, status: "pending", id: { not: claimId } },
         data: { status: "denied", decidedByUserId: user.id, decidedAt: now },
       });
-      await tx.shift.update({
-        where: { id: claim.shiftId },
+      // Guard the reassignment on the shift still being open — a concurrent
+      // approval or manual PATCH could have filled it since we read `claim`
+      // above. If it's no longer open, roll back.
+      const reassigned = await tx.shift.updateMany({
+        where: { id: claim.shiftId, employeeProfileId: null },
         data: { employeeProfileId: claim.employeeProfileId },
       });
+      if (reassigned.count === 0) {
+        throw new ShiftChangedError();
+      }
     }
-    return true;
+    return "decided" as const;
+  }).catch((err) => {
+    if (err instanceof ShiftChangedError) return "shift_changed" as const;
+    throw err;
   });
-  if (!decided) return jsonErr("already_decided", "This claim was already decided.", 409);
+  if (result === "already_decided") return jsonErr("already_decided", "This claim was already decided.", 409);
+  if (result === "shift_changed") {
+    return jsonErr(
+      "shift_changed",
+      "That shift changed before you could approve. Refresh and try again.",
+      409,
+    );
+  }
 
   const timezone = claim.shift.location.timezone;
   const shiftLabel = `${formatMediumDate(isoDateOf(claim.shift.date))} ${claim.shift.position.name} shift, ${formatShiftRange(
