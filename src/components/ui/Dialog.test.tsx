@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -93,5 +94,41 @@ describe("Dialog", () => {
     expect(trigger).not.toHaveFocus();
     rerender(<Harness open={false} />);
     expect(trigger).toHaveFocus();
+  });
+
+  it("does not move focus when onClose gets a new identity on re-render", async () => {
+    function Harness() {
+      const [count, setCount] = useState(0);
+      return (
+        <>
+          <button type="button" onClick={() => setCount((c) => c + 1)}>
+            Bump ({count})
+          </button>
+          <Dialog
+            open
+            title="Assign shift"
+            onClose={() => setCount((c) => c + 1)}
+            footer={
+              <>
+                <Button variant="secondary">Cancel</Button>
+                <Button>Save</Button>
+              </>
+            }
+          >
+            Body
+          </Dialog>
+        </>
+      );
+    }
+    const { rerender } = render(<Harness />);
+    const save = screen.getByRole("button", { name: "Save" });
+    await userEvent.tab(); // Cancel has initial focus; tab to Save
+    expect(save).toHaveFocus();
+
+    // Re-render with a brand-new inline onClose identity (simulates a parent
+    // re-render), without changing `open` or unmounting the dialog.
+    rerender(<Harness />);
+
+    expect(save).toHaveFocus();
   });
 });

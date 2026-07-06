@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cx } from "./cx";
 import { useModalBehavior } from "./use-modal-behavior";
@@ -24,9 +24,19 @@ export function Dialog({
   className,
 }: DialogProps) {
   const panelRef = useRef<HTMLDivElement>(null);
-  useModalBehavior(open, panelRef, onClose);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    // Client-only mount flag: guards `createPortal(..., document.body)` below
+    // from running during SSR/server rendering, where `document` is
+    // undefined. This is the standard mount-detection idiom and has no
+    // setState-free equivalent.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
+  }, []);
 
-  if (!open) return null;
+  useModalBehavior(mounted && open, panelRef, onClose);
+
+  if (!mounted || !open) return null;
 
   return createPortal(
     <div

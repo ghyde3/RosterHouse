@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type RefObject } from "react";
+import { useEffect, useRef, type RefObject } from "react";
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -16,6 +16,11 @@ export function useModalBehavior(
   panelRef: RefObject<HTMLElement | null>,
   onClose?: () => void
 ) {
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   useEffect(() => {
     if (!open) return;
     const previousFocus = document.activeElement as HTMLElement | null;
@@ -25,7 +30,7 @@ export function useModalBehavior(
 
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
-        onClose?.();
+        onCloseRef.current?.();
         return;
       }
       if (e.key !== "Tab") return;
@@ -58,5 +63,5 @@ export function useModalBehavior(
       document.body.style.overflow = previousOverflow;
       previousFocus?.focus();
     };
-  }, [open, onClose, panelRef]);
+  }, [open, panelRef]);
 }
