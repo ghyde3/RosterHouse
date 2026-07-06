@@ -1,0 +1,36 @@
+.cell {
+  min-height: 72px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+}
+
+.cell[data-conflict="true"] {
+  border: 1.5px dashed var(--status-danger);
+}
+
+.empty {
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-default);
+  background: var(--surface-card);
+  color: var(--border-strong);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.empty:hover {
+  background: var(--surface-brand-soft);
+  color: var(--text-brand);
+}
+
+.empty:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+  color: var(--text-brand);
+}

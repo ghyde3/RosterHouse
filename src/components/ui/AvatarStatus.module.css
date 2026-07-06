@@ -1,0 +1,36 @@
+.root {
+  position: relative;
+  display: inline-flex;
+  font-family: var(--font-sans);
+}
+
+.circle {
+  border-radius: 50%;
+  background: var(--green-100);
+  color: var(--green-800);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+
+.dot {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  border-radius: 50%;
+  border: 2px solid var(--surface-card);
+}
+
+.dot[data-status="available"] {
+  background: var(--status-success);
+}
+.dot[data-status="unavailable"] {
+  background: var(--status-danger);
+}
+.dot[data-status="pending"] {
+  background: var(--status-warning);
+}
+.dot[data-status="off"] {
+  background: var(--neutral-400);
+}
