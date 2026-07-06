@@ -1,16 +1,14 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { getEmployeeContext, getEmployeeShiftDetail } from "@/lib/queries/employee";
 import { formatDurationHrs } from "@/lib/time";
 import { SWAPS_ENABLED } from "@/lib/flags";
 import { PageTopBar } from "@/components/employee/PageTopBar";
+import { RequestSwapButton } from "@/components/employee/RequestSwapButton";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
 import { Icon } from "@/components/ui/Icon";
-import { Button } from "@/components/ui/Button";
-import { Tooltip } from "@/components/ui/Tooltip";
 import styles from "@/components/employee/employee.module.css";
 
 export default async function ShiftDetailPage({
@@ -85,18 +83,9 @@ export default async function ShiftDetailPage({
         </Card>
       )}
 
-      {!shift.isOpen &&
-        (SWAPS_ENABLED ? (
-          <Link href={`/swaps/new?shiftId=${shift.id}`} className={styles.linkBrand}>
-            Request swap
-          </Link>
-        ) : (
-          <Tooltip label="Coming soon">
-            <Button variant="ghost" fullWidth disabled>
-              Request swap
-            </Button>
-          </Tooltip>
-        ))}
+      {SWAPS_ENABLED && !shift.isOpen && new Date(shift.startsAt) > new Date() && (
+        <RequestSwapButton shiftId={shift.id} />
+      )}
     </div>
   );
 }
