@@ -1,0 +1,2041 @@
+{
+ "managerKit": {
+  "files_read": [
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/ui_kits/manager-web/ManagerApp.jsx",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/ui_kits/manager-web/DashboardScreen.jsx",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/ui_kits/manager-web/ScheduleView.jsx",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/ui_kits/manager-web/WeekGrid.jsx",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/ui_kits/manager-web/AssignShiftDialog.jsx",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/ui_kits/manager-web/SwapApprovals.jsx",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/ui_kits/manager-web/AvailabilityOverview.jsx",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/ui_kits/manager-web/Sidebar.jsx",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/ui_kits/manager-web/index.html"
+  ],
+  "screens": [
+   {
+    "name": "App shell / Sidebar (ManagerApp.jsx, Sidebar.jsx)",
+    "purpose": "Persistent left sidebar with brand, location switcher, 6-item nav (Dashboard, Schedule, Team, Availability, Time off, Swaps & open shifts), and current-user footer; hosts all screens via a single `nav` useState in ManagerApp.",
+    "data_needs": [
+     "User (name, initials, role=manager) \u2014 hardcoded 'Jamie Park' / 'JP'",
+     "Location (name; implied multi-location support) \u2014 hardcoded 'Downtown location'",
+     "Aggregate conflict count for schedule badge (derived from Shift.status)"
+    ],
+    "actions": [
+     "Switch active location (onLocationClick is a noop `() => {}` \u2014 no UI or mutation exists)",
+     "Sign out / account menu (not present at all)"
+    ],
+    "states_present": [
+     "default"
+    ],
+    "states_missing": [
+     "loading",
+     "error",
+     "permission-denied (no auth concept anywhere)",
+     "no-locations / single-location states"
+    ],
+    "hardcoded": [
+     "Manager name 'Jamie Park'",
+     "location 'Downtown location'",
+     "nav items with lucide icon string names rendered via <i data-lucide>"
+    ]
+   },
+   {
+    "name": "Dashboard (DashboardScreen.jsx)",
+    "purpose": "Manager landing view: greeting, 4 stat cards (coverage gaps, pending requests, projected labor cost, clocked-in count), 3 action cards deep-linking to Schedule/Time off/Swaps, and a 'Clocked in now' list.",
+    "data_needs": [
+     "Aggregates: coverage gap count for week, pending request count, projected labor cost (requires Employee.wage/hourlyRate \u2014 a field that appears NOWHERE in the kit)",
+     "TimeClockEntry (employee, role, clockInAt, active) for 'Clocked in now'",
+     "Shift conflicts count (prop `conflictCount` is passed in but IGNORED \u2014 card text hardcodes '2 shifts have conflicts')",
+     "Pending time-off requests (names for summary line), pending swap requests (name + shift summary)",
+     "User first name for greeting; time-of-day for 'Good afternoon'"
+    ],
+    "actions": [
+     "None \u2014 purely navigational (onGoSchedule/onGoTimeOff/onGoSwaps setState calls). All stats display-only"
+    ],
+    "states_present": [
+     "default"
+    ],
+    "states_missing": [
+     "loading",
+     "error",
+     "empty (no one clocked in, zero pending requests, zero conflicts \u2014 cards always render with hardcoded counts)"
+    ],
+    "hardcoded": [
+     "'Good afternoon, Jamie'",
+     "stat values: '2' gaps, '3' pending, '$4,120' labor cost",
+     "clockedIn array (Maria Garcia, Alex Kim)",
+     "'2 shifts have conflicts', '2 time-off requests waiting', 'Sam Torres, Alex Kim', '1 swap request', 'Priya Shah wants to swap her Saturday shift'"
+    ]
+   },
+   {
+    "name": "Schedule builder (ScheduleView.jsx + WeekGrid.jsx + header in ManagerApp.jsx)",
+    "purpose": "Core scheduling surface: Day/Week/Month tab modes with prev/next/Today navigation. Week mode = role-rows x 7-day-columns grid of ShiftBlocks with '+ Add' per cell; Day mode = per-role shift lists; Month mode = 42-cell calendar with shift-count badges that drills into Day mode. Header shows Draft/Published badge, conflict-count chip, 'Add shift' and 'Publish schedule' buttons.",
+    "data_needs": [
+     "Shift (id, role/position, date, startTime, endTime, employeeId?, status: confirmed|draft|open|conflict, conflictReason) \u2014 currently keyed by display string 'Role|Mon 6' with time as display string '7:00 AM \u2013 3:00 PM'; no IDs, no month/year, no structured times",
+     "Role/Position list \u2014 hardcoded ROLES = ['Line cook','Server','Dishwasher','Host'] in WeekGrid.jsx",
+     "Week entity or per-week publish state (published flag is a single app-wide boolean, not per-week)",
+     "Conflict computation inputs: employee's other shifts same day, availability, approved time off"
+    ],
+    "actions": [
+     "Create shift (cell click / '+ Add' \u2192 AssignShiftDialog \u2192 saveShift; local setState only)",
+     "Edit shift (click ShiftBlock \u2192 dialog prefilled \u2192 saveShift replaces list[index])",
+     "Delete shift (dialog 'Remove' \u2192 deleteShift; local only)",
+     "Publish week: flips every 'draft' shift to 'confirmed' app-wide, sets published=true, shows toast claiming '10 employees notified by push and text' (confirm dialog says '5 employees' \u2014 inconsistent). Needs backend mutation + notification fan-out",
+     "'Add shift' header button \u2014 NO onClick handler at all (dead button)"
+    ],
+    "states_present": [
+     "empty day ('No shifts scheduled for this day yet.' in DayView)",
+     "empty week-grid cell (WeekGridCell empty prop, click-to-add)",
+     "conflict styling on cells/blocks",
+     "draft vs published badge"
+    ],
+    "states_missing": [
+     "loading",
+     "error/save-failure",
+     "permission-denied",
+     "publish-in-progress",
+     "empty week (grid always renders 4 hardcoded roles)",
+     "month cells show only counts \u2014 no conflict/open indicators"
+    ],
+    "hardcoded": [
+     "ANCHOR = new Date(2026, 6, 6) \u2014 'Today' button resets to this fixed week, not the real today",
+     "entire INITIAL_SHIFTS object (~35 shifts for Jul 6\u201312, 2026, incl. 2 pre-baked conflicts with prose conflictReason strings)",
+     "ROLES array",
+     "publish notification counts (5 vs 10)"
+    ]
+   },
+   {
+    "name": "Assign/Edit Shift Dialog (AssignShiftDialog.jsx)",
+    "purpose": "Modal for creating or editing a shift in a role+day cell: employee select (or 'Open shift (unassigned)'), free-text Start/End time inputs, shows existing conflictReason chip, Save/Cancel/Remove.",
+    "data_needs": [
+     "Employee list filtered by role/qualification and availability for that day (currently a flat hardcoded EMPLOYEES array of 10 name strings \u2014 no IDs, no role filter, no availability awareness)",
+     "Existing shift fields for prefill (parses time by splitting the display string on ' \u2013 ', an en-dash \u2014 fragile)",
+     "Live conflict check result for the chosen employee+time (does not exist; saveShift blindly sets status 'draft' or 'open' and never recomputes conflicts, so editing a conflicted shift silently clears the conflict)"
+    ],
+    "actions": [
+     "Save shift \u2192 upsert Shift (assign employee or leave open); backend must run conflict detection + return validation",
+     "Remove shift \u2192 delete Shift"
+    ],
+    "states_present": [
+     "create vs edit mode",
+     "existing-conflict chip display"
+    ],
+    "states_missing": [
+     "input validation (free-text '7:00 AM' strings, no time picker, no start<end check, empty fields save fine)",
+     "saving/loading",
+     "error",
+     "conflict-warning-on-save",
+     "no-eligible-employees empty state"
+    ],
+    "hardcoded": [
+     "EMPLOYEES: 10 name strings duplicated from ManagerApp TEAM",
+     "time placeholder format '7:00 AM'"
+    ]
+   },
+   {
+    "name": "Team (inline in ManagerApp.jsx, nav === 'team')",
+    "purpose": "Flat list of employee cards: AvatarStatus (available/unavailable/pending/off dot) + name + role.",
+    "data_needs": [
+     "Employee (id, name, role/position, availabilityStatus: available|unavailable|pending|off) \u2014 hardcoded TEAM array of 10"
+    ],
+    "actions": [
+     "None implemented. Missing entirely: invite/add employee, edit role, deactivate \u2014 an MVP needs at least employee creation somewhere"
+    ],
+    "states_present": [
+     "default"
+    ],
+    "states_missing": [
+     "loading",
+     "empty (no employees)",
+     "error",
+     "any detail/edit view"
+    ],
+    "hardcoded": [
+     "TEAM array (10 employees with status values)"
+    ]
+   },
+   {
+    "name": "Availability overview (AvailabilityOverview.jsx)",
+    "purpose": "Read-only grid: employee rows x Mon\u2013Sun columns, green cell + dot = available that day, sunken cell = unavailable.",
+    "data_needs": [
+     "Availability per employee per weekday as booleans \u2014 no time ranges, no effective dates, no week-specific overrides. Mobile app presumably submits richer availability; this view flattens to day-level booleans"
+    ],
+    "actions": [
+     "None (view-only; no mutations)"
+    ],
+    "states_present": [
+     "default"
+    ],
+    "states_missing": [
+     "loading",
+     "empty",
+     "error",
+     "pending-availability-change indicator (Team screen has a 'pending' status concept this grid ignores)"
+    ],
+    "hardcoded": [
+     "TEAM_AVAILABILITY: only 5 of the 10 team members, inconsistent with TEAM list"
+    ]
+   },
+   {
+    "name": "Time off (inline in ManagerApp.jsx, nav === 'timeoff')",
+    "purpose": "List of pending time-off request cards (name, date range, reason) with Deny/Approve buttons.",
+    "data_needs": [
+     "TimeOffRequest (id, employeeId, startDate, endDate, reason, status) \u2014 hardcoded TIME_OFF array of 2; range is a display string 'Jul 14 \u2013 Jul 16'"
+    ],
+    "actions": [
+     "Approve time-off request \u2014 button has NO onClick handler (dead)",
+     "Deny time-off request \u2014 button has NO onClick handler (dead). Both need backend mutations and should feed conflict detection for scheduled shifts in the range"
+    ],
+    "states_present": [
+     "default"
+    ],
+    "states_missing": [
+     "loading",
+     "empty ('all caught up')",
+     "error",
+     "approved/denied history",
+     "confirmation feedback"
+    ],
+    "hardcoded": [
+     "TIME_OFF array (Sam Torres 'Family trip', Alex Kim 'Doctor appointment')"
+    ]
+   },
+   {
+    "name": "Swaps & open shifts (SwapApprovals.jsx)",
+    "purpose": "Approval queue for (a) employee-initiated shift swaps and (b) open-shift claims, with Deny/Approve per card.",
+    "data_needs": [
+     "SwapRequest (id, type: swap|open-claim, requestingEmployee, targetShift ref, claimingEmployee for open shifts, coverage note, status) \u2014 hardcoded INITIAL_REQUESTS of 2; shift references are prose strings ('Sat Jul 12, 4\u201310 PM Server shift'), not IDs"
+    ],
+    "actions": [
+     "Approve request and Deny request \u2014 both wired to the SAME `decide(id)` function that just removes the row from local state; no differentiated outcome, no shift reassignment, no notification. Backend must: reassign shift on approve, notify both parties, recheck conflicts"
+    ],
+    "states_present": [
+     "default",
+     "empty ('All caught up \u2014 no pending requests.')"
+    ],
+    "states_missing": [
+     "loading",
+     "error",
+     "approve/deny confirmation or undo",
+     "history of decided requests"
+    ],
+    "hardcoded": [
+     "INITIAL_REQUESTS (Priya Shah swap; Alex Kim open-shift claim)"
+    ]
+   }
+  ],
+  "gaps": [
+   {
+    "title": "Shift data model is display-strings only \u2014 no IDs, dates, or structured times",
+    "severity": "blocker",
+    "detail": "Shifts are keyed by `${role}|${weekdayAbbr} ${dayOfMonth}` (e.g. 'Server|Mon 6') with time as the string '7:00 AM \u2013 3:00 PM' and employee referenced by full-name string. There is no shift ID, no month/year (keys collide across months \u2014 'Mon 6' recurs), no timezone, and edits address shifts by array index. ScheduleView.jsx line 6 pins ANCHOR to Jul 6 2026 so mock data only aligns with that one week; navigating to any other week shows an empty grid. Prisma schema needs Shift{id, locationId, positionId, date, startsAt, endsAt, employeeId?, status} and every component's data shape must be remapped."
+   },
+   {
+    "title": "No conflict-detection logic exists \u2014 all conflicts are hardcoded strings",
+    "severity": "blocker",
+    "detail": "The 'conflict' status and prose conflictReason ('Overlaps Sam's 5\u201311 PM Dishwasher shift the same day') are baked into INITIAL_SHIFTS in ManagerApp.jsx (lines 32, 61). saveShift() never computes overlaps and always writes status 'draft'/'open', so editing a conflicted shift silently clears the flag and creating an overlapping shift raises nothing. The dashboard card, header ConflictChip, and cell styling all depend on this status. Overlap/availability/time-off conflict detection must be built server-side from scratch \u2014 the UI only defines how conflicts are displayed."
+   },
+   {
+    "title": "Navigation is useState tab switching, not routes",
+    "severity": "blocker",
+    "detail": "ManagerApp.jsx holds `const [nav, setNav] = useState('dashboard')` and conditionally renders screens; Team and Time off screens are inline JSX in ManagerApp rather than components. No URLs, no deep links, no back button. Must be decomposed into App Router routes (/dashboard, /schedule, /team, /availability, /timeoff, /swaps) with the sidebar as a layout; dialog and view-mode state can stay client-side."
+   },
+   {
+    "title": "Entire kit is window-global IIFEs on CDN React/Babel/lucide \u2014 nothing is importable",
+    "severity": "blocker",
+    "detail": "Every file is `(function(){...})()` reading React from the global scope and exporting via window.__rhManager* / window.RosterHouseDesignSystem_17c92d (from ../../_ds_bundle.js); index.html loads react, react-dom, @babel/standalone, and lucide from unpkg and transpiles JSX in the browser. None of this runs in Next.js: components must be rewritten as ES modules ('use client' where stateful), the design-system bundle replaced with real imports, lucide replaced by lucide-react (the `<i data-lucide>` + `window.lucide.createIcons()` in a dependency-array-less useEffect in ManagerApp.jsx line 93 fights React reconciliation and references window at render time), and styling depends on ../../styles.css CSS variables that must be brought into the app."
+   },
+   {
+    "title": "No auth, session, or permission model",
+    "severity": "blocker",
+    "detail": "Manager 'Jamie Park' and 'Downtown location' are hardcoded; there is no login screen, no role gate, no permission-denied state on any view. The manager app mutates schedules and approves requests, so auth + manager-role authorization is a precondition for every mutation the kit implies."
+   },
+   {
+    "title": "Approve/Deny mutations are dead or undifferentiated",
+    "severity": "blocker",
+    "detail": "Time-off Approve/Deny buttons (ManagerApp.jsx lines 219-220) have no onClick at all. Swap Approve and Deny both call the same decide(id) which only removes the row locally (SwapApprovals.jsx lines 42-43). The MVP loop 'employee requests swap \u2192 manager approves \u2192 shift reassigns \u2192 parties notified' has zero backing logic; approve must reassign the shift and both paths must persist a decision + notify."
+   },
+   {
+    "title": "Publish is an app-wide boolean with fake notification counts",
+    "severity": "major",
+    "detail": "publish() flips every draft shift across ALL weeks to confirmed and sets one global published flag; the Draft/Published badge never varies by week. The confirm dialog claims '5 employees will be notified' while the success toast says '10 employees notified by push and text' \u2014 both hardcoded. Needs per-week (or per-schedule) publish state, a real recipient count, and a notification pipeline (push/SMS) that doesn't exist anywhere in the kit."
+   },
+   {
+    "title": "AssignShiftDialog has no validation and no eligibility filtering",
+    "severity": "major",
+    "detail": "Start/End are free-text Inputs parsed by splitting on the en-dash ' \u2013 '; no time picker, no start<end or format validation, empty times save successfully. Employee dropdown is a hardcoded 10-name list with no filtering by role, availability, or time-off, and no conflict warning on save. Backend needs structured time inputs plus an eligibility/conflict check endpoint."
+   },
+   {
+    "title": "Dashboard stats are all fake and one requires missing wage data",
+    "severity": "major",
+    "detail": "Coverage gaps '2', pending requests '3', labor cost '$4,120', and the clocked-in list are hardcoded; the conflictCount prop that IS passed in is ignored in favor of literal '2 shifts have conflicts' text. 'Projected labor cost' requires an hourly wage/rate field that exists nowhere in the design; 'Clocked in now' requires time-clock entries written by the mobile app. Each stat needs a real aggregation query."
+   },
+   {
+    "title": "Roles/positions are hardcoded and per-location config is a noop",
+    "severity": "major",
+    "detail": "ROLES = ['Line cook','Server','Dishwasher','Host'] is a constant in WeekGrid.jsx driving the grid rows, DayView, and MonthView counts. The sidebar location switcher's onLocationClick is `() => {}`. A Position entity (per location) and a Location entity with a switcher are needed; otherwise the grid cannot render other businesses' roles."
+   },
+   {
+    "title": "Availability model is weekday booleans, inconsistent with the rest of the kit",
+    "severity": "major",
+    "detail": "AvailabilityOverview shows only 5 of the 10 TEAM employees and reduces availability to one boolean per weekday \u2014 no time windows, no effective dates, no pending-change state (which the Team screen's AvatarStatus 'pending' implies exists). If the employee mobile app submits time-ranged availability, this view undersells the data and conflict detection can't use it as-is. Data contracts between the two apps need reconciliation."
+   },
+   {
+    "title": "No loading or error states anywhere in the kit",
+    "severity": "major",
+    "detail": "Every screen renders synchronously from in-memory constants. Zero skeletons, spinners, fetch-error, retry, or save-failure affordances exist to copy from the design. These must be designed net-new for all six screens plus both dialogs when data becomes async."
+   },
+   {
+    "title": "Dead 'Add shift' header button",
+    "severity": "minor",
+    "detail": "The secondary 'Add shift' button in the Schedule header (ManagerApp.jsx line 171) has no onClick. Cell-level '+ Add' works, so either wire the header button to open AssignShiftDialog with role/day pickers or drop it."
+   },
+   {
+    "title": "'Today' button navigates to the hardcoded anchor week, not today",
+    "severity": "minor",
+    "detail": "ScheduleView's Today button sets offset to 0, which is ANCHOR (Jul 6 2026), and all date math derives from that constant. Port must anchor to the location's current week (respecting week-start convention and timezone)."
+   },
+   {
+    "title": "Missing empty states on Team, Time off, Availability; month view lacks conflict indicators",
+    "severity": "minor",
+    "detail": "Team, Time off, and Availability render nothing (not even a message) when their arrays are empty; only DayView, WeekGridCell, and SwapApprovals have designed empty states. MonthView badges show shift counts but hide conflicts and open shifts, weakening the drill-down cue."
+   },
+   {
+    "title": "Team management actions absent",
+    "severity": "major",
+    "detail": "The Team screen is display-only: no invite/add employee, no role editing, no deactivation. Without an employee-creation flow somewhere, the manager cannot seed the roster that every other screen depends on. (Could live in an admin/onboarding flow, but no design exists for it.)"
+   }
+  ],
+  "notes": "Navigation: single-page useState tab switching in ManagerApp.jsx ('dashboard'|'schedule'|'team'|'availability'|'timeoff'|'swaps'); Team and Time off screens are inline JSX in ManagerApp rather than separate components; ScheduleView adds its own useState for day/week/month mode and period offset. Conflict detection: purely presentational \u2014 'conflict' statuses and reason strings are hardcoded in mock data; no computation exists, and saveShift/publish never recompute or block on conflicts (publish is allowed with conflicts present). Porting hazards: window-global IIFE module system, window.RosterHouseDesignSystem_17c92d design-system bundle (../../_ds_bundle.js) and ../../styles.css CSS-variable dependency, CDN unpkg scripts (React 18.3.1 UMD, @babel/standalone in-browser JSX, lucide UMD), <i data-lucide> icons hydrated by window.lucide.createIcons() inside a useEffect with no dependency array, toLocaleDateString('en-US') formatting, en-dash ' \u2013 ' time-string parsing, and fixed ANCHOR date of 2026-07-06 that the mock shift keys ('Mon 6'\u2026'Sun 12') only match for that single week. Everything stateful must become 'use client' components; all mock constants (INITIAL_SHIFTS, TEAM, TIME_OFF, TEAM_AVAILABILITY, EMPLOYEES, INITIAL_REQUESTS, ROLES, clockedIn, dashboard stats) map to Prisma entities: Location, User/Employee(+wage for labor cost), Position, Shift, Availability, TimeOffRequest, SwapRequest, TimeClockEntry, plus a per-week publish/notification concept. Notification copy ('notified by push and text') implies a push+SMS pipeline with no other design support."
+ },
+ "employeeKit": {
+  "files_read": [
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/ui_kits/employee-mobile/EmployeeApp.jsx",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/ui_kits/employee-mobile/index.html"
+  ],
+  "screens": [
+   {
+    "name": "Login (LoginScreen, EmployeeApp.jsx:40-61)",
+    "purpose": "Employee sign-in with phone/email + password; link to invite flow",
+    "data_needs": [
+     "User: email/phone, passwordHash",
+     "Session/token on success"
+    ],
+    "actions": [
+     "login (authenticate + create session) \u2014 onLogin just flips local auth state, inputs are uncontrolled so credentials are never read",
+     "forgot password \u2014 rendered as plain static text, not even clickable, no flow exists"
+    ],
+    "states_present": [
+     "default form"
+    ],
+    "states_missing": [
+     "loading/submitting",
+     "invalid-credentials error",
+     "field validation",
+     "locked/disabled account",
+     "offline"
+    ],
+    "hardcoded": [
+     "placeholder 'maria@example.com'"
+    ]
+   },
+   {
+    "name": "Accept invite (AcceptInviteScreen, EmployeeApp.jsx:63-78)",
+    "purpose": "New employee onboarding: set name, phone, password, join team",
+    "data_needs": [
+     "Invite: token, inviter (manager) name, location/org name, role, status, expiry",
+     "User creation: fullName, phone, password"
+    ],
+    "actions": [
+     "accept invite / create account + join location \u2014 onJoin just flips auth state, no mutation, inputs uncontrolled"
+    ],
+    "states_present": [
+     "default form"
+    ],
+    "states_missing": [
+     "invite token entry or deep-link handling (screen is reached from a login-page link, not an invite URL)",
+     "expired/invalid/already-used invite error",
+     "loading",
+     "validation"
+    ],
+    "hardcoded": [
+     "inviter 'Jamie Park'",
+     "team 'Downtown location'"
+    ]
+   },
+   {
+    "name": "Home / My Shifts (HomeScreen, EmployeeApp.jsx:80-114)",
+    "purpose": "Greeting, weekly summary banner, upcoming shift list; entry to shift detail and notifications",
+    "data_needs": [
+     "current User: firstName",
+     "Shift[]: date, startTime, endTime, role/position, status, locationId",
+     "weekly aggregate: shift count + total hours"
+    ],
+    "actions": [
+     "none (navigation only)"
+    ],
+    "states_present": [
+     "populated list"
+    ],
+    "states_missing": [
+     "loading",
+     "empty (no shifts this week)",
+     "error",
+     "non-confirmed status variants \u2014 Badge is hardcoded 'Confirmed', ignores shift.status",
+     "past/history view"
+    ],
+    "hardcoded": [
+     "MY_SHIFTS array (3 shifts, EmployeeApp.jsx:5-9)",
+     "banner '3 shifts \u00b7 24 hrs total' is literal text, not computed from data",
+     "user name 'Maria'"
+    ]
+   },
+   {
+    "name": "Shift detail (ShiftDetailScreen, EmployeeApp.jsx:116-152)",
+    "purpose": "Single shift: time, role, status, location, coworkers, manager note, swap entry point",
+    "data_needs": [
+     "Shift: date, start/end, role, status, location.name, notes",
+     "coworkers: other Users assigned to overlapping shifts"
+    ],
+    "actions": [
+     "request swap \u2014 Button at line 149 has NO onClick handler; dead button, no swap flow UI exists anywhere (no teammate picker, no post-to-pool, no request status)"
+    ],
+    "states_present": [
+     "populated detail",
+     "conditional notes card"
+    ],
+    "states_missing": [
+     "loading",
+     "not-found error",
+     "swap-pending status",
+     "cancelled shift"
+    ],
+    "hardcoded": [
+     "Badge again hardcoded 'Confirmed' regardless of shift.status",
+     "shift is passed as an in-memory object from Home, not fetched by id \u2014 must become /shifts/[id] route with fetch"
+    ]
+   },
+   {
+    "name": "Availability (AvailabilityScreen, EmployeeApp.jsx:160-311)",
+    "purpose": "Recurring weekly availability (Simple day toggles / Advanced per-day hours) + Request time off dialog",
+    "data_needs": [
+     "Availability: per user per weekday {available: bool, startTime, endTime}",
+     "TimeOffRequest: startDate, endDate, reason enum (vacation/sick/personal/other), note, status (pending/approved/denied)"
+    ],
+    "actions": [
+     "save availability \u2014 NO save button or mutation exists; edits live in local useState and are lost when the tab unmounts",
+     "submit time off request \u2014 'Send request' button (line 253) only calls setReqOpen(false); nothing is sent, no date validation (end<start, empty)"
+    ],
+    "states_present": [
+     "simple/advanced tab toggle",
+     "presets (every day/weekdays/weekends)",
+     "conditional 'other' reason textarea",
+     "dialog open/close"
+    ],
+    "states_missing": [
+     "loading existing availability from server",
+     "save success/error feedback",
+     "list of pending/past time-off requests with status",
+     "manager-approval pending state",
+     "validation on free-text time inputs"
+    ],
+    "hardcoded": [
+     "default Mon-Fri available, 9:00 AM\u20135:00 PM everywhere",
+     "advanced hours are free-text Inputs, not time pickers"
+    ]
+   },
+   {
+    "name": "Time clock (TimeClockScreen, EmployeeApp.jsx:373-412)",
+    "purpose": "Clock in / clock out for the current shift with claimed geolocation verification",
+    "data_needs": [
+     "TimeEntry: userId, shiftId, clockInAt, clockOutAt, geo coords",
+     "current/active Shift lookup (to know what the user is clocking into)",
+     "clock state on load (am I already clocked in?)"
+    ],
+    "actions": [
+     "clock in \u2014 local boolean toggle only, no mutation, no timestamp recorded",
+     "clock out \u2014 same",
+     "geolocation capture \u2014 copy says 'Uses your phone's location to confirm you're on-site' but no navigator.geolocation call exists"
+    ],
+    "states_present": [
+     "clocked-in vs clocked-out visual toggle"
+    ],
+    "states_missing": [
+     "loading current clock state",
+     "no-shift-scheduled-now guard",
+     "geolocation denied/out-of-range error",
+     "offline queueing (critical: clock-in must not silently fail offline)",
+     "elapsed-time display",
+     "today/week timesheet history",
+     "early/late clock-in warnings"
+    ],
+    "hardcoded": [
+     "'Clocked in for Line cook \u00b7 Downtown location' literal string"
+    ]
+   },
+   {
+    "name": "Open shifts / Swap (SwapScreen, EmployeeApp.jsx:313-352)",
+    "purpose": "Claim open shifts; request swaps on own shifts",
+    "data_needs": [
+     "OpenShift[]: date, start/end, role, locationId, eligibility rules",
+     "claim status per shift (open/claimed/pending approval)",
+     "user's own Shift[] for the swap section"
+    ],
+    "actions": [
+     "claim open shift \u2014 setClaimed local state only (line 329); button flips to 'Claimed' instantly with no mutation, no manager-approval concept, no conflict handling if someone else claimed first",
+     "request swap \u2014 Button at line 346 has NO onClick; dead, and no swap-request flow/screen exists"
+    ],
+    "states_present": [
+     "claimed (disabled button) per-card local state"
+    ],
+    "states_missing": [
+     "empty open-shifts list",
+     "loading",
+     "error",
+     "claim pending-approval state",
+     "already-taken race error",
+     "swap request status (sent/accepted/declined)"
+    ],
+    "hardcoded": [
+     "OPEN_SHIFTS array (2 shifts, EmployeeApp.jsx:11-14)",
+     "'My shifts' section reuses MY_SHIFTS.slice(0,2)"
+    ]
+   },
+   {
+    "name": "Notifications (NotificationsScreen, EmployeeApp.jsx:354-371)",
+    "purpose": "In-app notification feed (schedule published, shift reminder, swap approved)",
+    "data_needs": [
+     "Notification[]: type, title, body, createdAt (relative time), readAt, linked entity id (shift/swap/request)"
+    ],
+    "actions": [
+     "none \u2014 no mark-as-read, no tap-through to the related shift/request"
+    ],
+    "states_present": [
+     "populated list"
+    ],
+    "states_missing": [
+     "empty state",
+     "loading",
+     "unread indicators (and no unread badge on the Home bell icon)",
+     "pagination"
+    ],
+    "hardcoded": [
+     "NOTIFICATIONS array (EmployeeApp.jsx:16-20); each item has a 'tone' field that is never rendered"
+    ]
+   },
+   {
+    "name": "Profile (ProfileScreen, EmployeeApp.jsx:414-445)",
+    "purpose": "User identity card, notification channel preferences (push/SMS/email), logout",
+    "data_needs": [
+     "User: name, initials, role, location name",
+     "NotificationPreferences: push, sms, email booleans"
+    ],
+    "actions": [
+     "update notification preferences \u2014 local useState only, no persistence mutation",
+     "log out \u2014 Button at line 442 has NO onClick; dead",
+     "no edit-profile / change-password / change-phone actions at all"
+    ],
+    "states_present": [
+     "toggle states (local)"
+    ],
+    "states_missing": [
+     "loading",
+     "save confirmation/error for preference changes"
+    ],
+    "hardcoded": [
+     "'Maria Garcia', 'MG' initials, 'Line cook \u00b7 Downtown location'"
+    ]
+   }
+  ],
+  "gaps": [
+   {
+    "title": "No data layer anywhere \u2014 every screen renders module-level hardcoded arrays",
+    "severity": "blocker",
+    "detail": "MY_SHIFTS, OPEN_SHIFTS, NOTIFICATIONS are constants at EmployeeApp.jsx:5-20; availability, clock state, and preferences are local useState with no persistence. There is zero fetch/query/mutation plumbing, so no screen has loading or error handling to port. Every screen needs a server data contract (Prisma models: User, Location, Invite, Shift, ShiftAssignment, OpenShift, SwapRequest, TimeOffRequest, Availability, TimeEntry, Notification, NotificationPreferences) plus loading/empty/error states designed from scratch."
+   },
+   {
+    "title": "Auth is entirely fake \u2014 inputs uncontrolled, no session, no invite token",
+    "severity": "blocker",
+    "detail": "Login and Accept-invite forms never read their input values; onLogin/onJoin just set useState auth='app' (EmployeeApp.jsx:475-501). No credential validation, no session/JWT, no route protection. Invite flow has no token/deep-link handling \u2014 real invites arrive as a URL (e.g. /invite/[token]) that must resolve inviter/location/role server-side; the UI hardcodes 'Jamie Park' and 'Downtown location'. MVP loop (employee logs in and sees their real shifts) cannot work."
+   },
+   {
+    "title": "All core employee mutations are dead or local-only",
+    "severity": "blocker",
+    "detail": "The four actions that define the employee MVP loop do not exist as operations: (1) Request swap buttons at EmployeeApp.jsx:149 and :346 have no onClick and there is no swap flow UI at all; (2) claim open shift is a local setClaimed toggle (line 329) with no mutation or approval semantics; (3) availability has no save action \u2014 edits are lost on tab switch; (4) time-off 'Send request' only closes the dialog (line 253); (5) clock in/out is a local boolean with no timestamp, no TimeEntry write, and no geolocation despite the on-screen copy promising location verification."
+   },
+   {
+    "title": "No routing \u2014 state-machine navigation cannot port to App Router",
+    "severity": "blocker",
+    "detail": "Navigation is three useState values in EmployeeApp (auth, tab, push at lines 475-478); shift detail receives a shift object by reference, not an id. Nothing maps to URLs: browser back breaks, deep links (invite links, notification tap-through, shift links) are impossible. Must be restructured to Next.js routes, e.g. /login, /invite/[token], /(app)/shifts, /(app)/shifts/[id], /(app)/availability, /(app)/clock, /(app)/open-shifts, /(app)/profile, /(app)/notifications, with the tab bar as a layout component and middleware-based auth guarding."
+   },
+   {
+    "title": "Runtime architecture is browser-global UMD + Babel-standalone \u2014 none of it ports directly",
+    "severity": "blocker",
+    "detail": "index.html loads React 18 dev UMD, Babel standalone, and lucide from unpkg CDNs and pulls components from window.RosterHouseDesignSystem_17c92d (../../_ds_bundle.js). The DS components (Button, Badge, Card, Switch, Dialog, Input, Tabs, Select, Tag, ConflictChip) must be converted to importable TypeScript modules; icons use <i data-lucide> plus window.lucide.createIcons() in a dependency-less useEffect (re-runs every render, EmployeeApp.jsx:480-482) and must move to lucide-react; ../../styles.css CSS variables must be imported globally."
+   },
+   {
+    "title": "Shift status is cosmetic \u2014 Badge hardcoded 'Confirmed' everywhere",
+    "severity": "major",
+    "detail": "MY_SHIFTS items carry a status field but HomeScreen (line 108) and ShiftDetailScreen (line 126) render a literal 'Confirmed' badge. No designs exist for pending/unpublished, swap-pending, or cancelled shift states, which the scheduling loop will produce immediately after launch."
+   },
+   {
+    "title": "No offline handling, especially for time clock",
+    "severity": "major",
+    "detail": "This is a mobile web app for hourly workers; the time clock claims geolocation verification but has no geolocation code, no offline queue, and no failure state. A clock-in that silently no-ops offline loses payroll data. At minimum need optimistic UI + retry/queue and explicit offline/error banners."
+   },
+   {
+    "title": "No approval/pending semantics for claims, swaps, or time off",
+    "severity": "major",
+    "detail": "Claiming an open shift flips instantly to 'Claimed'; real flow needs pending-manager-approval and already-taken conflict states. Swap requests and time-off requests have no status tracking UI (no list of my requests, no accepted/declined feedback) even though notification copy references 'Swap request approved'."
+   },
+   {
+    "title": "Notifications are read-only decoration",
+    "severity": "major",
+    "detail": "No unread flag or bell badge, no mark-as-read mutation, no tap-through to the referenced shift/request, and the tone field in the mock data is never rendered. Also no push-notification registration despite UI copy promising push alerts for time-off decisions."
+   },
+   {
+    "title": "PhoneShell demo frame is not a real mobile layout",
+    "severity": "major",
+    "detail": "PhoneShell (EmployeeApp.jsx:455-473) is a fixed 390x844 div with a fake bezel for the design gallery. The real app must use full viewport, responsive sizing, and safe-area insets; the bottom tab bar's padding '8px 4px 14px' is a hardcoded stand-in for env(safe-area-inset-bottom)."
+   },
+   {
+    "title": "Home banner totals hardcoded and no forgot-password flow",
+    "severity": "major",
+    "detail": "'3 shifts \u00b7 24 hrs total' (line 94) is literal text \u2014 must be computed from the user's published shifts. 'Forgot password?' (line 51) is inert text with no reset flow designed; needed soon after launch for a workforce that forgets passwords often."
+   },
+   {
+    "title": "Availability advanced hours are unvalidated free-text inputs",
+    "severity": "minor",
+    "detail": "Start/end times are plain text Inputs (lines 219-234) with placeholder-style values; needs a time picker or select with validation (end after start) before the data can be trusted by the scheduler. Also edits are lost when switching Simple/Advanced tabs since Tabs remounts content around shared state that persists, but leaving the screen entirely discards everything."
+   },
+   {
+    "title": "Time-off dialog lacks date validation",
+    "severity": "minor",
+    "detail": "No check that end >= start or that dates are set before 'Send request'; reason select has an 'other' branch with textarea but no required-field enforcement."
+   },
+   {
+    "title": "Profile has no edit affordances",
+    "severity": "minor",
+    "detail": "Name/phone/password cannot be changed; avatar initials 'MG' are hardcoded rather than derived. Logout button dead (covered under auth blocker but the button itself also needs a handler)."
+   },
+   {
+    "title": "lucide createIcons runs on every render",
+    "severity": "minor",
+    "detail": "React.useEffect at EmployeeApp.jsx:480-482 has no dependency array; irrelevant after migrating to lucide-react but a perf smell if the pattern is copied."
+   }
+  ],
+  "notes": "All 8 readme-claimed screens exist (Login, Accept invite, My Shifts home + Shift detail overlay, Availability with time-off dialog, Time Clock, Open Shifts/Swap, Notifications overlay, Profile) \u2014 9 distinct screen components total in EmployeeApp.jsx. Coverage claim is accurate at the visual level; the gap is that essentially nothing is functional. Navigation/auth faking: EmployeeApp holds three useState values \u2014 auth ('login'|'invite'|'app'), tab (bottom-bar key), and push (overlay descriptor for shiftDetail/notifications with the shift passed by object reference). Any tap on 'Log in' or 'Join team' enters the app; credentials are never read because all form inputs are uncontrolled. What breaks on Next.js port: (1) no URLs \u2014 browser back, refresh, deep links (invite links, notification tap-through) all break; every screen needs a route and shift detail needs an id param; (2) window.RosterHouseDesignSystem_17c92d global + _ds_bundle.js + Babel-standalone JSX transform + React UMD dev builds from unpkg \u2014 all must become proper TS module imports; (3) <i data-lucide> icons + window.lucide.createIcons() in an every-render useEffect must become lucide-react components; (4) ../../styles.css CSS variables must be imported globally (inline styles reference tokens like --surface-brand, --text-h1-size heavily); (5) PhoneShell fixed 390x844 bezel is gallery chrome to delete. index.html carries a @dsCard gallery annotation (group='Employee Mobile', viewport 440x900). Useful token detail for the schema step: shift mock fields are {role, time, day, location, status, coworkers[], notes}; open shift {role, time, day}; notification {title, body, tone, when}; availability is per-weekday {available, start, end}; time-off request {startDate, endDate, reason enum vacation|sick|personal|other, note}. DS components consumed: Button, Badge, Card, Switch, Dialog, ConflictChip (imported but unused in this kit), Tag (unused), Input, Tabs, Select."
+ },
+ "components": {
+  "files_read": [
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/forms/Button.d.ts",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/forms/Button.jsx",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/forms/Input.d.ts",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/forms/Input.jsx",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/forms/Select.d.ts",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/forms/Select.jsx",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/forms/Checkbox.d.ts",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/forms/Checkbox.jsx",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/forms/Switch.d.ts",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/forms/Switch.jsx",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/feedback/Badge.d.ts",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/feedback/Badge.jsx",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/feedback/Tag.d.ts",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/feedback/Tag.jsx",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/feedback/Toast.d.ts",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/feedback/Toast.jsx",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/feedback/Tooltip.d.ts",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/feedback/Tooltip.jsx",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/containers/Card.d.ts",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/containers/Card.jsx",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/containers/Dialog.d.ts",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/containers/Dialog.jsx",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/containers/Tabs.d.ts",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/containers/Tabs.jsx",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/scheduling/ShiftBlock.d.ts",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/scheduling/ShiftBlock.jsx",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/scheduling/WeekGridCell.d.ts",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/scheduling/WeekGridCell.jsx",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/scheduling/AvatarStatus.d.ts",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/scheduling/AvatarStatus.jsx",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/scheduling/ConflictChip.d.ts",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/scheduling/ConflictChip.jsx",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/forms/Button.prompt.md",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/ui_kits/manager-web/ManagerApp.jsx",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/ui_kits/manager-web/Sidebar.jsx",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/ui_kits/manager-web/DashboardScreen.jsx",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/ui_kits/manager-web/ScheduleView.jsx",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/ui_kits/manager-web/WeekGrid.jsx",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/ui_kits/manager-web/AssignShiftDialog.jsx",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/ui_kits/manager-web/AvailabilityOverview.jsx",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/ui_kits/manager-web/SwapApprovals.jsx",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/ui_kits/manager-web/index.html",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/ui_kits/employee-mobile/EmployeeApp.jsx",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/ui_kits/employee-mobile/index.html",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/readme.md",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/tokens/fonts.css"
+  ],
+  "components": [
+   {
+    "name": "Button (forms)",
+    "props_summary": "variant?: 'primary'|'secondary'|'ghost'|'accent'|'danger' (default 'primary'); size?: 'sm'|'md'|'lg' (default 'md'); disabled?: boolean; icon?: ReactNode (leading); fullWidth?: boolean; children; onClick?: () => void; type?: 'button'|'submit'. Renders native <button>.",
+    "external_deps": [
+     "Global CSS custom properties from styles.css/tokens (--accent-*, --surface-*, --radius-*, --duration-*, --ease-*, --font-sans)",
+     "No icons/CDN \u2014 icon is passed in by caller (kits pass Lucide CDN <i> elements)"
+    ],
+    "portability_issues": [
+     "Needs 'use client' \u2014 useState drives hover/active state via onMouseEnter/Leave/Down/Up; should be replaced with CSS :hover/:active/:focus-visible (JS hover breaks on touch devices and sticks after tap on the mobile app)",
+     "No visible focus state at all (no outline/focus ring) \u2014 keyboard a11y failure; tokens define --shadow-focus but Button never uses it",
+     "onClick typed () => void (loses MouseEvent); no rest-prop spread, no className/style, no aria-*, no name/form/value attrs, no forwardRef \u2014 closed API; kit code even passes style={{marginTop:8}} to Button in EmployeeApp AcceptInviteScreen which is silently dropped",
+     "type union omits 'reset'; no loading/pending state (needed for server-action useFormStatus submit buttons)",
+     ".d.ts declares JSX.Element return \u2014 global JSX namespace is gone under React 19/Next 15 types; convert to .tsx with React.JSX.Element/ReactElement"
+    ]
+   },
+   {
+    "name": "Input (forms)",
+    "props_summary": "label?: string; placeholder?: string; value?: string; onChange?: (e: ChangeEvent<HTMLInputElement>) => void; type?: string (default 'text'); error?: string; disabled?: boolean; icon?: ReactNode. Renders label + wrapper div + native <input>.",
+    "external_deps": [
+     "Token CSS variables (--surface-*, --border-*, --status-danger, --shadow-focus, --text-*, --radius-md)"
+    ],
+    "portability_issues": [
+     "Needs 'use client' \u2014 useState for focused styling (should be CSS :focus-within)",
+     "Label is not associated with the input (no htmlFor/id) \u2014 clicking label does nothing, screen readers get an unlabeled field",
+     "Error text not linked via aria-describedby and no aria-invalid on the input",
+     "Controlled-only with no uncontrolled path: passing value without onChange yields a read-only field + React warning (EmployeeApp LoginScreen/AcceptInviteScreen do exactly this); no defaultValue support",
+     "No name/id/autoComplete/required/inputMode/onBlur props and no forwardRef \u2014 unusable with FormData/server actions (no name means value never submits) or react-hook-form",
+     "Fixed height 44 and type passed as raw string; type='date' is used by EmployeeApp time-off dialog with no date-picker styling consideration"
+    ]
+   },
+   {
+    "name": "Select (forms)",
+    "props_summary": "label?: string; value?: string; onChange?: (value: string) => void; options?: {value: string; label: string}[]; placeholder?: string (default 'Select\u2026'). Custom dropdown: trigger <button> + absolutely-positioned option list.",
+    "external_deps": [
+     "document.addEventListener('mousedown') for outside-click close",
+     "Token CSS variables",
+     "Unicode '\u25be' glyph as caret icon (readme claims no unicode icons \u2014 inconsistency)"
+    ],
+    "portability_issues": [
+     "Needs 'use client' \u2014 useState/useRef/useEffect + document listener",
+     "Not a native <select> and renders no hidden input/name \u2014 invisible to FormData/server actions",
+     "Zero keyboard support: options are divs with onClick only \u2014 no arrow keys, Enter, Esc, typeahead; no role='listbox'/'option', no aria-expanded/aria-haspopup/aria-activedescendant; mouse-only control",
+     "Dropdown is not portaled (position:absolute, zIndex 10) \u2014 will be clipped by overflow:hidden/auto ancestors; risky inside Dialog and scrolling panels",
+     "Direct DOM mutation for option hover (e.currentTarget.style.background = \u2026) \u2014 replace with CSS",
+     "No way to clear back to empty/unassigned, yet AssignShiftDialog's placeholder is 'Open shift (unassigned)' \u2014 once an employee is picked you cannot revert the shift to open; needs a clearable/none option",
+     "Label not associated with trigger; no disabled or error props (API asymmetric with Input)"
+    ]
+   },
+   {
+    "name": "Checkbox (forms)",
+    "props_summary": "label?: string; checked?: boolean (default false); onChange?: (checked: boolean) => void; disabled?: boolean. Renders <label> wrapping a styled <span> with inline check SVG \u2014 no native input.",
+    "external_deps": [
+     "Token CSS variables",
+     "Inline SVG checkmark (no CDN)"
+    ],
+    "portability_issues": [
+     "No native <input type='checkbox'>: not focusable, no Space-key toggle, no role='checkbox'/aria-checked, no focus ring \u2014 keyboard and screen-reader inaccessible; invisible to FormData/server actions (no name)",
+     "onClick sits on the inner box span, and the label element wraps no control \u2014 clicking the label text does NOT toggle",
+     "Needs 'use client' (event handler), though it holds no state itself",
+     "Controlled-only; no defaultChecked/uncontrolled mode, no indeterminate state",
+     "No id/name/value/className passthrough, no forwardRef"
+    ]
+   },
+   {
+    "name": "Switch (forms)",
+    "props_summary": "label?: string; checked?: boolean (default false); onChange?: (checked: boolean) => void; disabled?: boolean. Renders <label> with space-between layout wrapping a styled track/thumb span \u2014 no native input.",
+    "external_deps": [
+     "Token CSS variables (--radius-pill, --neutral-300, --accent-primary, --shadow-sm)"
+    ],
+    "portability_issues": [
+     "Same a11y hole as Checkbox: no native input or role='switch', no aria-checked, not focusable/keyboard-operable, no form participation",
+     "onClick only on the track span \u2014 label text click does nothing despite full-width space-between layout inviting it",
+     "Needs 'use client' when given onChange",
+     "Controlled-only, no defaultChecked",
+     "No className/style/name/id passthrough"
+    ]
+   },
+   {
+    "name": "Badge (feedback)",
+    "props_summary": "tone?: 'success'|'warning'|'danger'|'info'|'neutral' (default 'success'); children. Pill-shaped uppercase status label, purely presentational.",
+    "external_deps": [
+     "Token CSS variables (--status-*-bg, --status-*, --amber-800, --text-caption-*)"
+    ],
+    "portability_issues": [
+     "Cleanest port \u2014 no hooks/handlers, can stay a Server Component",
+     "No className/style passthrough and no rest props; .d.ts JSX.Element return type needs updating for React 19 types"
+    ]
+   },
+   {
+    "name": "Tag (feedback)",
+    "props_summary": "children; onRemove?: () => void; color?: 'neutral'|'brand'|'accent' (default 'neutral'). Label chip with optional '\u00d7' remove affordance.",
+    "external_deps": [
+     "Token CSS variables"
+    ],
+    "portability_issues": [
+     "Remove control is a <span>'\u00d7'</span> with onClick \u2014 not a <button>, no aria-label, no keyboard access",
+     "Needs 'use client' only when onRemove is passed \u2014 worth splitting or accepting client-boundary at usage sites",
+     "No className/style passthrough; note: Tag is imported in EmployeeApp's destructure but never actually rendered in either UI kit \u2014 zero real usage examples"
+    ]
+   },
+   {
+    "name": "Toast (feedback)",
+    "props_summary": "tone?: 'success'|'warning'|'danger'|'info' (default 'success'); title: string (required); description?: string; onClose?: () => void. Static notification card only \u2014 no positioning, timer, or stacking.",
+    "external_deps": [
+     "Token CSS variables",
+     "Inline SVG icon (no CDN)"
+    ],
+    "portability_issues": [
+     "Icon is a hardcoded checkmark SVG for ALL tones \u2014 a 'danger' or 'warning' toast still shows a check mark; needs per-tone icons (lucide-react)",
+     "No toast system: no provider/portal/queue/auto-dismiss/animation \u2014 ManagerApp hand-rolls position:fixed wrapper + setTimeout(3500); the port needs a Toaster primitive (or sonner-style manager)",
+     "No aria-live/role='status' \u2014 screen readers never announce it",
+     "Close '\u00d7' is a span, not a button (no keyboard/AT access)",
+     "Needs 'use client' when onClose passed; fixed width 320 not responsive on mobile"
+    ]
+   },
+   {
+    "name": "Tooltip (feedback)",
+    "props_summary": "label: string (required); children; side?: 'top'|'bottom' (default 'top'). Hover-triggered absolutely-positioned span.",
+    "external_deps": [
+     "Token CSS variables (--green-900, --text-inverse, --shadow-md)"
+    ],
+    "portability_issues": [
+     "Needs 'use client' \u2014 useState + mouse events",
+     "Hover-only: no onFocus/onBlur trigger, no touch/long-press support \u2014 dead weight on the employee mobile app; no keyboard access to the tip",
+     "No role='tooltip'/aria-describedby wiring; content invisible to AT",
+     "Not portaled \u2014 clipped by overflow:hidden ancestors (week grid, dialogs) and whiteSpace:nowrap can overflow the viewport near edges",
+     "Only top/bottom sides; no delay/offset options"
+    ]
+   },
+   {
+    "name": "Card (containers)",
+    "props_summary": "children; padding?: string (default 'var(--space-6)'); hoverable?: boolean; style?: React.CSSProperties. Bordered, shadowed surface div; style prop merges last.",
+    "external_deps": [
+     "Token CSS variables (--surface-card, --border-default, --radius-lg, --shadow-sm/md)"
+    ],
+    "portability_issues": [
+     "Uses React.useState for hover shadow even when hoverable=false \u2014 forces client component for a purely visual effect; port to CSS :hover and Card can stay a Server Component",
+     "No onClick/className/role props \u2014 UI kits work around it by putting onClick on an inner div (DashboardScreen, HomeScreen), producing non-keyboard-accessible 'clickable cards' with the padding area dead to clicks; port needs an interactive-card pattern (as prop or wrapping <button>/<Link>)",
+     "Kits rely on passing layout via style (display:flex etc.) \u2014 acceptable but className support would fit Next/Tailwind conventions better"
+    ]
+   },
+   {
+    "name": "Dialog (containers)",
+    "props_summary": "open: boolean (required); onClose?: () => void; title?: string; children?; footer?: ReactNode. Fixed-overlay modal, Escape-to-close, overlay-click closes, panel stopPropagation; returns null when closed.",
+    "external_deps": [
+     "document.addEventListener('keydown') for Escape",
+     "Token CSS variables",
+     "Scrim color hardcoded rgba(10,20,17,0.4)"
+    ],
+    "portability_issues": [
+     "Needs 'use client' \u2014 useEffect + document listener",
+     "No portal (ReactDOM.createPortal) \u2014 rendered in place; breaks under transformed/overflow ancestors and competes on z-index (100)",
+     "No focus management: no focus trap, no initial focus, no focus restore on close; background not inert; body scroll not locked while open",
+     "No role='dialog'/aria-modal/aria-labelledby \u2014 port should use native <dialog> or Radix",
+     "Overlay onClick close fires on mousedown-inside\u2192mouseup-outside drags (text selection in Input closes the dialog)",
+     "Fixed width 420/maxWidth 90vw, no size variants and no bottom-sheet mode \u2014 readme's mobile layout rules call for bottom sheets, but no Sheet primitive exists; employee app uses this centered dialog instead",
+     "No open/close animation despite motion tokens existing"
+    ]
+   },
+   {
+    "name": "Tabs (containers)",
+    "props_summary": "tabs?: {value: string; label: string}[]; value?: string (controlled); defaultValue?: string; onChange?: (value: string) => void. Segmented control; properly supports both controlled and uncontrolled modes (only primitive that does).",
+    "external_deps": [
+     "Token CSS variables (--surface-sunken, --surface-card, --shadow-sm)"
+    ],
+    "portability_issues": [
+     "Needs 'use client' \u2014 useState",
+     "Tab items are divs: no role='tablist'/'tab', no aria-selected, no tabIndex, no arrow-key navigation \u2014 mouse-only",
+     "No panel association (no id/aria-controls); it is a value-switcher only, callers own panel rendering",
+     "Internal default computed once from tabs[0] \u2014 if tabs load async the uncontrolled default is stale",
+     "No className passthrough; no disabled-tab support"
+    ]
+   },
+   {
+    "name": "ShiftBlock (scheduling)",
+    "props_summary": "role: string (required); time: string (required); employeeName?: string; status?: 'confirmed'|'open'|'conflict'|'draft' (default 'confirmed'); compact?: boolean; conflictReason?: string (shown only when status='conflict'); onClick?: () => void.",
+    "external_deps": [
+     "Token CSS variables \u2014 uses raw palette tokens (--green-50/300/800, --amber-50/300/800, --red-50/100/500/700) rather than semantic tokens",
+     "Inline SVG warning triangle (no CDN)"
+    ],
+    "portability_issues": [
+     "Clickable <div> \u2014 no button semantics, tabIndex, or Enter/Space handling; core interactive element of the schedule builder is keyboard-inaccessible",
+     "Needs 'use client' when onClick passed (otherwise stateless and could be server-rendered)",
+     "time/day are display strings ('7:00 AM \u2013 3:00 PM') with an en-dash convention the kit splits on (' \u2013 ') \u2014 port must model start/end as real timestamps in Prisma and format at render",
+     "No drag/drop affordance despite readme describing 'manager drags shifts onto a week grid' \u2014 DnD must be layered on in the port",
+     "Status palette keyed to raw color tokens; dark-mode/theming later would require touching the component"
+    ]
+   },
+   {
+    "name": "WeekGridCell (scheduling)",
+    "props_summary": "children?; empty?: boolean; hasConflict?: boolean (dashed red border); onClick?: () => void. Grid cell with hover tint + '+' hint when empty.",
+    "external_deps": [
+     "Token CSS variables"
+    ],
+    "portability_issues": [
+     "Needs 'use client' \u2014 React.useState hover (portable to CSS :hover)",
+     "Clickable div, no keyboard/ARIA semantics; '+' is a bare text glyph with no accessible name",
+     "onClick fires even when not empty in the primitive; kit guards with `dayShifts.length === 0 &&` at call site \u2014 semantics belong inside the component",
+     "No drop-target support for drag-and-drop scheduling",
+     "minHeight 72 hardcoded; no density prop to match ShiftBlock's compact mode"
+    ]
+   },
+   {
+    "name": "AvatarStatus (scheduling)",
+    "props_summary": "name: string (required, initials derived from first letters of first two words); status?: 'available'|'unavailable'|'pending'|'off' (default 'available'); size?: number (default 40). Initials circle + colored status dot.",
+    "external_deps": [
+     "Token CSS variables (--green-100/800, --status-*, --neutral-400, --surface-card for dot ring)"
+    ],
+    "portability_issues": [
+     "Stateless/no handlers \u2014 can be a Server Component (good)",
+     "Status conveyed by dot color only \u2014 no title/aria-label/visually-hidden text (WCAG 1.4.1 use-of-color failure)",
+     "name.split(' ').map(n => n[0]) yields undefined-in-JSX on empty/whitespace names \u2014 needs guarding",
+     "No photo/src support (initials only) and no way to hide the dot; both UI kits hand-roll plain avatars (Sidebar 'JP', ProfileScreen 'MG') because a status dot is always forced",
+     "Single hardcoded green initials palette \u2014 no per-user color hashing"
+    ]
+   },
+   {
+    "name": "ConflictChip (scheduling)",
+    "props_summary": "children only. Inline danger chip with warning-triangle SVG; no variants, no handlers.",
+    "external_deps": [
+     "Token CSS variables (--status-danger, --status-danger-bg)",
+     "Inline SVG (no CDN)"
+    ],
+    "portability_issues": [
+     "Server-component safe as-is",
+     "No onClick \u2014 DashboardScreen uses it as a 'View in Schedule Builder' pseudo-link by wrapping in a clickable div; needs interactive support or a distinct pattern",
+     "No severity/type variants although readme lists three conflict kinds (double-booked, outside availability, overtime); no role='status'/aria-live for dynamically appearing warnings"
+    ]
+   }
+  ],
+  "gaps": [
+   {
+    "title": "No toast manager/Toaster primitive \u2014 Toast is only a static card",
+    "severity": "major",
+    "detail": "ManagerApp.jsx implements toast behavior inline: a position:fixed bottom-right wrapper div plus setTimeout(() => setToast(null), 3500). There is no provider, portal, queue, auto-dismiss, or animation primitive in components/. The Next.js port needs a Toaster/useToast primitive (or sonner) or every screen re-implements this. Compounding it, Toast renders a checkmark icon for every tone including danger/warning."
+   },
+   {
+    "title": "Missing Textarea primitive \u2014 raw styled <textarea> inlined in employee app",
+    "severity": "major",
+    "detail": "EmployeeApp.jsx AvailabilityScreen (time-off 'other' reason) hand-builds a label + <textarea> with ~15 inline style props duplicating Input's visual treatment (border, radius, tokens) but without Input's focus ring/error handling. Should be a Textarea primitive alongside Input; shift 'notes from manager' will need it on the manager side too."
+   },
+   {
+    "title": "All app navigation chrome is one-off: Sidebar, TopBar, bottom tab bar",
+    "severity": "major",
+    "detail": "Manager Sidebar.jsx (nav rail with active state, location switcher, user chip) and EmployeeApp's TopBar (back/bell header) and bottom tab bar are built from raw divs with Lucide CDN <i data-lucide> icons \u2014 none exist in components/. These are the highest-traffic interactive surfaces in both apps and are all mouse-only divs. The port needs Sidebar/NavItem, AppBar, and BottomNav primitives wired to next/navigation (Link, usePathname) instead of useState nav."
+   },
+   {
+    "title": "Lucide icons load from unpinned CDN and render via <i data-lucide> + createIcons()",
+    "severity": "major",
+    "detail": "Both index.html files load https://unpkg.com/lucide@latest (unpinned) and every kit screen calls window.lucide.createIcons() in an un-deps'd useEffect (runs every render) to swap <i data-lucide=\"...\"> elements. This pattern is incompatible with SSR/App Router. Every icon site (Sidebar nav, ScheduleView chevrons, EmployeeApp TopBar/tab bar/TimeClock/ShiftDetail) must be converted to lucide-react components. Note components/ itself is clean (inline SVGs only); the CDN dependency is entirely in ui_kits. Also readme.md's index references an assets/icons/ directory that does not exist in the export."
+   },
+   {
+    "title": "No date/time primitives \u2014 times and dates are free-text display strings",
+    "severity": "major",
+    "detail": "AssignShiftDialog.jsx captures shift start/end as free-text Inputs ('7:00 AM') and stores time as the concatenated string `${start} \u2013 ${end}`, splitting on ' \u2013 ' to edit; AvailabilityScreen does the same for per-day hours; the time-off dialog uses bare Input type='date'. There is no TimePicker/DatePicker/DateRange primitive. For the Prisma port this is a data-model landmine: shifts must be real timestamps with validation, formatted only at render \u2014 the string convention (en-dash with spaces) cannot round-trip safely."
+   },
+   {
+    "title": "Form primitives cannot participate in forms (server actions/FormData)",
+    "severity": "major",
+    "detail": "Systemic across components/forms: Select, Checkbox, and Switch render no native form element and no name attribute; Input accepts no name prop. Nothing in the kit can submit through a <form action={serverAction}> without controlled-state plumbing on every field. For a Next.js App Router app this forces fully client-managed forms or a rewrite of the primitives to be form-native."
+   },
+   {
+    "title": "Availability grid/cell rendered inline, duplicated across both apps",
+    "severity": "minor",
+    "detail": "AvailabilityOverview.jsx (manager) builds a 7-day availability matrix from raw divs (green cell + dot vs sunken cell); EmployeeApp's AvailabilityScreen builds the same concept as Switch lists with per-day hour Inputs. No AvailabilityCell/AvailabilityGrid primitive exists even though availability is a core domain object; the two representations will drift."
+   },
+   {
+    "title": "'+ Add shift' dashed button duplicated in two kit files, absent from primitives",
+    "severity": "minor",
+    "detail": "WeekGrid.jsx (inline, ~20 style props, fontSize 10.5) and ScheduleView.jsx's addButton() helper (fontSize 12) implement the same dashed add-affordance separately with slightly different metrics. WeekGridCell only covers the empty-cell '+ ' case. Should be one AddShiftButton primitive."
+   },
+   {
+    "title": "StatCard and date-pager (prev/period/next/Today) are inline one-offs",
+    "severity": "minor",
+    "detail": "DashboardScreen.jsx defines StatCard (label/value/tone metric card) locally; ScheduleView.jsx inlines the date navigation cluster (ghost chevron Buttons + fixed-width period label + Today button) including Lucide CDN icons. Both are reusable patterns (stats will recur in reporting; date-pager recurs in any calendar surface) worth promoting to primitives."
+   },
+   {
+    "title": "No plain Avatar (status-dot-free) primitive",
+    "severity": "minor",
+    "detail": "AvatarStatus always renders a status dot, so Sidebar.jsx ('JP' chip) and EmployeeApp ProfileScreen ('MG', 52px) hand-roll initials circles with duplicated styling. Add showStatus?: false or a base Avatar primitive."
+   },
+   {
+    "title": "Time-clock circular action button is a bespoke one-off",
+    "severity": "minor",
+    "detail": "EmployeeApp TimeClockScreen builds a 180px round clock-in/out control from a raw div (with Lucide CDN icon, hardcoded colors, no button semantics). It is the single most important employee action and is outside the design system; either a Button variant or a ClockButton primitive is needed."
+   },
+   {
+    "title": "Dialog used where readme mandates mobile bottom sheets; no Sheet primitive",
+    "severity": "minor",
+    "detail": "readme.md layout rules say mobile primary actions live 'in a bottom tab bar or a bottom sheet', but the employee app's Request-time-off flow uses the centered 420px Dialog. No Sheet/BottomSheet component exists in components/."
+   },
+   {
+    "title": "Text links rendered as plain divs \u2014 no Link/TextButton primitive",
+    "severity": "minor",
+    "detail": "EmployeeApp LoginScreen's 'Forgot password?' and 'New here? Accept your invite' are styled divs (one without any onClick). In the Next.js port these become next/link anchors; a styled Link/TextButton primitive would keep them consistent."
+   }
+  ],
+  "notes": "Systemic porting facts that apply to every component: (1) All 16 primitives are plain .jsx with hand-written sibling .d.ts files; the port should merge them into typed .tsx and drop the .d.ts. The .d.ts files all return `JSX.Element`, which no longer resolves under React 19/Next 15 types (use React.JSX.Element or ReactElement). (2) Every component styles exclusively via inline style objects referencing CSS custom properties from styles.css \u2192 tokens/*.css; the app must import styles.css (or a translated tokens layer) globally in app/layout.tsx. tokens/fonts.css pulls Figtree via a Google Fonts CSS @import \u2014 replace with next/font/google to avoid render-blocking CSS import and external requests. (3) 13 of 16 components require 'use client' as written (hooks and/or handlers); only Badge, ConflictChip, and AvatarStatus are server-safe, and Card/Button/Input/WeekGridCell only need client status because hover/focus visuals are done in JS \u2014 moving those to CSS pseudo-classes would shrink the client boundary considerably. (4) No component forwards refs, spreads rest props, or accepts className; every primitive is a closed API and the UI kits already hit the limits (onClick on inner divs inside Card, style dropped by Button). (5) Accessibility is the dominant defect class: no focus styles anywhere, form controls without native inputs, divs as buttons/tabs/options, dialogs without focus traps, color-only status. Budget for an a11y pass, or map these APIs onto Radix/Base-UI equivalents while keeping the token-driven styling. (6) UI kits are IIFE scripts communicating via window globals (window.RosterHouseDesignSystem_17c92d, window.__rh*) with React 18 UMD + Babel Standalone in index.html \u2014 demo scaffolding to discard, but the screen JSX inside is a faithful spec for the App Router routes. (7) ScheduleView anchors to a hardcoded ANCHOR = new Date(2026, 6, 6) and en-US toLocaleDateString; shift/day identity is string keys like 'Server|Mon 6' \u2014 port must key by real dates/IDs. (8) Demo copy bugs to not carry over: ManagerApp publish dialog says '5 employees will be notified' while the toast says '10 employees notified'; Toast shows a checkmark for all tones."
+ },
+ "infra": {
+  "files_read": [
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/styles.css",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/tokens/fonts.css",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/tokens/colors.css",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/tokens/typography.css",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/tokens/spacing.css",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/tokens/effects.css",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/_ds_manifest.json",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/SKILL.md",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/readme.md",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/_adherence.oxlintrc.json",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/_ds_bundle.js (skimmed: header manifest + first ~120 lines)",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/guidelines/iconography.html",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/guidelines/type-display.html",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/forms/Button.jsx",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/ui_kits/manager-web/index.html (head)",
+   "directory listings + greps across components/, ui_kits/, guidelines/, tokens/"
+  ],
+  "findings": [
+   "FONTS TODAY: Single mechanism \u2014 tokens/fonts.css line 6 does `@import url(\"https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap\")`. Google Fonts CDN only; zero font files ship in the export (manifest `fonts: []`, `brandFonts: [{family: Figtree, status: ok, tokens: [--font-sans]}]`). Figtree is an explicit SUBSTITUTION \u2014 readme states no brand typeface was provided and Figtree was chosen as 'nearest match'. Font stack token: `--font-sans: \"Figtree\", \"Segoe UI\", system-ui, -apple-system, sans-serif` (tokens/typography.css line 6); `--font-mono` is pure system stack (no webfont).",
+   "ICONS TODAY: Two distinct mechanisms. (a) UI kits and guideline cards load Lucide via UMD CDN `<script src=\"https://unpkg.com/lucide@latest/dist/umd/lucide.js\">` (UNPINNED @latest, no SRI integrity attribute \u2014 the react/babel scripts DO have integrity hashes) and render icons imperatively with `<i data-lucide=\"name\">` + `window.lucide.createIcons()` called after mount (e.g. EmployeeApp.jsx line 481). This pattern is fundamentally incompatible with React re-renders \u2014 icons vanish on state updates unless createIcons is re-run. (b) The 16 reusable DS components mostly embed hand-copied Lucide SVG paths INLINE (ConflictChip.jsx, Toast.jsx, Checkbox.jsx, ShiftBlock.jsx contain raw `<svg stroke=\"currentColor\" strokeWidth=2.2/2.5>` markup), so the core component library has NO runtime icon dependency. Icon vocabulary used across kit: calendar, clock, bell, user, users, settings, home, plus, check, x, chevron-right/left, alert-triangle, repeat, map-pin, phone, search, play, square (per guidelines/iconography.html + ui_kit greps). Stroke convention 1.5\u20132px.",
+   "DEMO-ONLY CDN SCAFFOLDING (do not port): ui_kits/*/index.html and components/*.card.html load react@18.3.1 + react-dom@18.3.1 development UMD builds and @babel/standalone@7.29.0 from unpkg, and execute .jsx via `<script type=\"text/babel\">`. _ds_bundle.js is a prebuilt IIFE bundle of all 16 components compiled to React.createElement, registered on `window.RosterHouseDesignSystem_17c92d` with per-file try/catch error capture and source hashes. All of this is preview harness, not production code.",
+   "TOKEN CSS STRUCTURE: styles.css is a 5-line pure @import aggregator (fonts.css \u2192 colors.css \u2192 typography.css \u2192 spacing.css \u2192 effects.css, in that order; manifest `globalCssPaths` confirms the same order). Every token is a CSS custom property on a single `:root` block \u2014 no classes, no resets, no element styles anywhere in the token layer. colors.css layers semantic aliases (--surface-*, --text-*, --border-*, --accent-*, --status-*) over raw scales (--green-*, --amber-*, --neutral-*, --red-*, --blue-*) via var() indirection. 137 tokens total per manifest. All type/spacing sizes are px (not rem). NO dark mode: manifest `themes: []`, zero hits for prefers-color-scheme/data-theme/color-scheme across the entire export \u2014 single light 'warm paper' theme only. The alias indirection layer means a dark theme could later be added by re-pointing aliases in a `[data-theme=\"dark\"]` block without touching components, but nothing exists today.",
+   "MANIFEST (_ds_manifest.json): namespace `RosterHouseDesignSystem_17c92d`; 16 components with sourcePaths (containers: Card/Dialog/Tabs; feedback: Badge/Tag/Toast/Tooltip; forms: Button/Checkbox/Input/Select/Switch; scheduling: AvatarStatus/ConflictChip/ShiftBlock/WeekGridCell); 20 preview cards; full token inventory with kind classification (color/font/spacing/radius/shadow/other); `startingPoints: []`, `templates: []`, `themes: []`, `source: \"spa\"`. Metadata bug: the six --text-* COLOR aliases (--text-primary, --text-secondary, etc.) are misclassified as `kind: \"font\"` in both the manifest and the oxlint x-omelette block.",
+   "SKILL.md: minimal 9-line Claude-skill wrapper (name: rosterhouse-design, user-invocable) that just says 'read README.md, copy assets, follow the rules for production code'. All real conventions live in readme.md: content voice (sentence case everywhere, never title case, no emoji in UI chrome, 12-hour clock times '7:00 AM\u20133:00 PM' never military, durations as '8 hrs' not decimal, specific non-blaming error copy), interaction rules (hover = darken one step via --accent-hover, press = darken further + translateY(1px), no scale/shrink, 120\u2013280ms ease-out only, no bounce/spring/confetti), visual rules (no gradients/photography/textures, warm-tinted shadows never pure black, no transparency/blur except modal scrim rgba(10,20,17,0.4), initials-on-color avatars, radius mapping: 6px small controls / 10px inputs+buttons / 16px cards / 22px sheets / pill badges+FAB), layout rules (manager web: fixed left rail + sticky week-grid header; employee mobile: single-column, bottom tab bar / bottom sheet for primary actions). These are app-level conventions the Next.js build should preserve verbatim.",
+   "ADHERENCE TOOLING (_adherence.oxlintrc.json): oxlint config, all rules at 'warn'. Three enforcement categories: (1) no-restricted-syntax regex literals banning raw hex colors ('use a design-system color token via var()'), raw px values, and any font-family other than Figtree; (2) AST-selector prop contracts for all 16 components \u2014 allowed prop lists plus enum validation (Button variant: primary|secondary|ghost|accent|danger, size sm|md|lg; Badge tone: success|warning|danger|info|neutral; ShiftBlock status: confirmed|open|conflict|draft; AvatarStatus status: available|unavailable|pending|off; Toast tone; Tag color: neutral|brand|accent; Tooltip side: top|bottom); (3) no-restricted-imports forcing imports through 'index.js' barrel \u2014 BUT no index.js exists anywhere in the export (find returned zero), so that rule references a nonexistent file. Also an `x-omelette` metadata block re-listing components (all `replaces: []`), full token list, tokenKinds, and fontFamilies: [Figtree]. The prop-enum contracts are the durable value \u2014 they translate directly into TypeScript union types for the ported components (the .d.ts files already exist alongside each .jsx).",
+   "COMPONENT FORMAT: each component ships as .jsx (import React from 'react', named export, all styling via inline style objects referencing var(--token)), plus a .d.ts and a .prompt.md. Hover/press states are implemented with React useState + onMouseEnter/onMouseLeave (e.g. Button.jsx, Card.jsx) rather than CSS pseudo-classes \u2014 this breaks on touch devices (the primary employee-mobile audience) and should be reimplemented as CSS classes when porting. Button.jsx danger variant hardcodes fg '#fff' (lines 48\u201350), violating the export's own raw-hex adherence rule; readme also mandates 'nothing is pure white/black' so danger fg should arguably be --neutral-50.",
+   "assets/icons/ VERDICT: does NOT exist. readme.md line 42 ('Index' section) claims '`assets/icons/` \u2014 Lucide icon set (SVG)', but `ls` confirms no assets/ directory at all, and readme's own Iconography section (lines 138\u2013142) contradicts the index: 'no binary asset download was possible from this environment, so nothing is duplicated into assets/ \u2014 components reference the CDN directly.' The only binary asset in the export is uploads/pasted-1783291965045-0.png (26KB).",
+   "TYPOGRAPHY DETAIL: token scale covers display-xl/lg/md (56/44/34px w700), h1/h2/h3 (28/22/18px, 700/600/600), body-lg/body/body-sm (17/15/13px w400), caption (12px w600 +0.02em tracking), label (13px w600). Note: fonts.css loads weight 800 and readme says '700/800 for headlines', but no typography token actually uses 800 \u2014 keep 800 in the next/font weights array anyway since guideline cards reference it ('Figtree 700\u2013800')."
+  ],
+  "gaps": [
+   {
+    "title": "All fonts and icons are runtime CDN dependencies",
+    "severity": "blocker",
+    "detail": "Google Fonts CDN @import for Figtree (tokens/fonts.css) and unpkg Lucide UMD for icons must be replaced before production. fonts.css must be dropped entirely in favor of next/font/google (Figtree, weights 400/500/600/700/800, variable: '--font-sans') so the token file's --font-sans keeps resolving; icons must move to the lucide-react npm package. The `lucide@latest` script is also unpinned with no SRI hash \u2014 a supply-chain risk even for previews."
+   },
+   {
+    "title": "readme-advertised assets/icons/ directory does not exist",
+    "severity": "major",
+    "detail": "readme.md line 42 lists `assets/icons/ \u2014 Lucide icon set (SVG)` but no assets/ directory exists in the export; readme's Iconography section admits nothing was downloaded. No local icon files ship at all. Consequence: the Next.js app cannot copy icons from the export \u2014 it must add lucide-react as a dependency (or vendor SVGs) and the readme index should be corrected."
+   },
+   {
+    "title": "No dark mode / no alternate themes",
+    "severity": "major",
+    "detail": "Manifest `themes: []`; zero prefers-color-scheme, data-theme, or color-scheme usage anywhere. Only a single light 'warm paper' theme exists. For an employee mobile web app used for night-shift clock-ins this is a real product gap. Mitigation path exists: the semantic alias layer in colors.css (--surface-*/--text-*/--border-*/--accent-*/--status-*) means dark mode can be added later as a `[data-theme=\"dark\"]` override block without touching components \u2014 but every alias value would need designing from scratch."
+   },
+   {
+    "title": "Adherence config references a nonexistent index.js barrel",
+    "severity": "major",
+    "detail": "_adherence.oxlintrc.json's no-restricted-imports rule requires importing DS components 'from index.js, not component internals', and its overrides exempt **/index.js \u2014 but no index.js exists anywhere in the export. Carrying the config over verbatim enforces an impossible convention. The port should create the barrel (e.g. components/ui/index.ts) and rewrite the restricted-import globs to the app's actual paths."
+   },
+   {
+    "title": "Icon rendering in UI kits is imperative and React-unsafe",
+    "severity": "major",
+    "detail": "UI kit screens use `<i data-lucide=\"...\">` + a one-shot window.lucide.createIcons() after mount (EmployeeApp.jsx line 481). Any React re-render that adds/changes an `<i data-lucide>` node produces an empty element. All ui_kit screen code being used as reference for the Next.js pages must have icon usage rewritten to lucide-react components \u2014 it cannot be copied as-is."
+   },
+   {
+    "title": "Components are .jsx with useState-driven hover/press, not production-ready TSX",
+    "severity": "minor",
+    "detail": "All 16 components use inline style objects plus React state for hover/hover-active (onMouseEnter/onMouseDown), which produces no hover fallback on touch devices and defeats SSR/CSS optimization. .d.ts files exist and encode the prop contracts, so porting to typed .tsx with CSS-class states (CSS Modules or Tailwind arbitrary values on the tokens) is mechanical but required \u2014 treat export components as specs, not drop-in code."
+   },
+   {
+    "title": "Export's own code violates its adherence rules",
+    "severity": "minor",
+    "detail": "Button.jsx danger variant hardcodes '#fff' (raw hex, and 'pure white' which readme forbids); many components hardcode raw px literals (Button padding '6px 12px', fontSize 13/14/16; Dialog width 420) that the raw-px lint rule flags. The px rule as written (Literal regex \\b\\d+px\\b) will warn on legitimate one-off dimensions too \u2014 carry the hex-color and font-family rules over as-is, but expect to loosen or scope the px rule."
+   },
+   {
+    "title": "Manifest token-kind misclassification",
+    "severity": "minor",
+    "detail": "--text-primary/-secondary/-tertiary/-inverse/-brand/-link are colors but tagged kind:'font' in _ds_manifest.json and the oxlint x-omelette block. Harmless at runtime; only matters if tooling is built on the manifest's kind field."
+   },
+   {
+    "title": "px-based type and spacing tokens (no rem)",
+    "severity": "minor",
+    "detail": "All font-size/spacing tokens are absolute px, so browser/user font-size scaling is ignored \u2014 an accessibility consideration for the hourly-worker mobile audience. Converting token values to rem at port time (keeping the same visual sizes) is cheap now and expensive later."
+   },
+   {
+    "title": "Whole system is an unvalidated from-scratch proposal",
+    "severity": "minor",
+    "detail": "readme Caveats: no Figma, no logo, no brand fonts, no existing identity \u2014 palette/type/components are a proposal from a spec + Q&A. No logo exists (wordmark is plain Figtree text). Phase-3 surfaces (payroll, reporting, tip pooling), multi-location switching, onboarding wizard, and billing screens have no designs. Not a porting defect, but the synthesis step should treat visuals as v1-replaceable and keep tokens as the single source of truth."
+   }
+  ],
+  "external_deps": [
+   "https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap (tokens/fonts.css \u2014 replace with next/font/google Figtree exposing --font-sans)",
+   "https://unpkg.com/lucide@latest/dist/umd/lucide.js (ui_kits/*/index.html, components/*.card.html, guidelines/iconography.html \u2014 unpinned, no SRI; replace with lucide-react npm package)",
+   "https://unpkg.com/react@18.3.1/umd/react.development.js (demo shells only \u2014 superseded by Next.js React)",
+   "https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js (demo shells only)",
+   "https://unpkg.com/@babel/standalone@7.29.0/babel.min.js (demo shells only \u2014 in-browser JSX transform, drop entirely)"
+  ],
+  "porting_plan_notes": [
+   "globals.css strategy: copy tokens/colors.css + typography.css + spacing.css + effects.css verbatim into app/styles/tokens/ (or merge their :root blocks into one tokens.css) and @import them at the top of app/globals.css; do NOT copy fonts.css or styles.css. Preserve manifest globalCssPaths order (colors \u2192 typography \u2192 spacing \u2192 effects). Add `body { background: var(--surface-page); color: var(--text-primary); font-family: var(--font-sans); }` since the export's token layer intentionally contains no element styles.",
+   "next/font wiring: `const figtree = Figtree({ subsets: ['latin'], weight: ['400','500','600','700','800'], variable: '--font-figtree' })` on <html className={figtree.variable}>, then change the --font-sans token to `var(--font-figtree), \"Segoe UI\", system-ui, -apple-system, sans-serif` \u2014 one-line token edit keeps every component/token reference working with zero CDN traffic.",
+   "Icons: install lucide-react pinned; build a thin Icon wrapper defaulting strokeWidth 1.75\u20132 and size 16\u201326 to match the kit's 1.5\u20132px stroke convention; the needed set is ~18 icons (calendar, clock, bell, user, users, settings, home, plus, check, x, chevron-right, chevron-left, alert-triangle, repeat, map-pin, phone, search, play, square). Components with inline SVG (ConflictChip, Toast, Checkbox, ShiftBlock) can keep inline paths or switch to lucide-react \u2014 either is CDN-free.",
+   "Rebuild the 16 components as typed .tsx using the shipped .d.ts prop contracts and the oxlint enum lists as TS unions (Button variant/size, Badge tone, ShiftBlock status, AvatarStatus status, Tag color, Toast tone, Tooltip side); replace useState hover/press with CSS :hover/:active classes per readme interaction rules (darken one step / translateY(1px)). Export everything from a single barrel to satisfy the adherence convention.",
+   "Carry over adherence linting adapted: keep raw-hex-color ban and Figtree-only font-family rule (oxlint or ESLint no-restricted-syntax on app source, excluding the token files themselves); recreate the restricted-imports rule against the new barrel path; expect to scope or drop the raw-px rule; alternatively encode enums in TS and let the compiler replace the JSX prop-contract selectors.",
+   "Preserve readme conventions as app copy/UX rules: sentence case everywhere, 12-hour times, '8 hrs' durations, no emoji in chrome, calm confirmations, specific error copy ('This shift overlaps with Maria's 2\u20136 PM shift'), manager left-rail + sticky week-grid header, employee bottom tab bar. Consider converting px tokens to rem during the copy step.",
+   "Do not port: styles.css (trivial aggregator), fonts.css, _ds_bundle.js, *.card.html, ui_kits/*/index.html shells, Babel/React UMD scripts. ui_kits/*.jsx screens are reference material for page layouts only \u2014 their data-lucide usage and window.__rh_* globals must not survive the port."
+  ]
+ },
+ "gapAnalysis": {
+  "missing_screens": [
+   "Manager login (no auth screens exist anywhere in ui_kits/manager-web/ \u2014 ManagerApp.jsx boots straight to dashboard)",
+   "Manager signup / account creation",
+   "Manager forgot-password / reset-password",
+   "Org & location onboarding wizard (create company, create location, define roles) \u2014 readme.md line 158-160 confirms intentionally not built, but the product cannot bootstrap without it",
+   "Location switcher / location management (Sidebar location control is wired to a no-op: onLocationClick={() => {}} in ManagerApp.jsx line 156)",
+   "Invite employee / add team member (manager side of the invite that employee-mobile's AcceptInviteScreen presupposes \u2014 Team view in ManagerApp.jsx lines 194-206 is a read-only list with no add/invite affordance)",
+   "Team member detail / edit (contact info, role assignment, wage for the 'Projected labor cost' stat, deactivate/remove)",
+   "Roles/positions management (ROLES is hardcoded to ['Line cook','Server','Dishwasher','Host'] in WeekGrid.jsx line 4 and the week grid is structured as role rows \u2014 no screen to create/rename roles)",
+   "Manager settings (org settings, schedule/week-start settings, notification preferences \u2014 employee has notification prefs in ProfileScreen, manager has none)",
+   "Manager account menu / profile / logout (sidebar avatar 'Jamie Park' in Sidebar.jsx lines 71-88 is not interactive; there is no logout on manager web)",
+   "Timesheets / clock-in review for manager (dashboard shows 'Clocked in now' and 'Projected labor cost' but there is no screen to view, edit, approve, or export punch data)",
+   "Time-off request history / decided-requests view for manager (ManagerApp timeoff view lists only 2 pending items)",
+   "Error pages for the web app (404, 500, access-denied) and loading/skeleton states \u2014 none exist in either kit",
+   "Billing / subscription screens (readme line 160 flags as not built)",
+   "Employee forgot-password / reset-password ('Forgot password?' in EmployeeApp.jsx lines 50-52 is static text with no onClick and no target screen)",
+   "Employee invite entry / invite-link landing (AcceptInviteScreen at EmployeeApp.jsx lines 63-78 assumes the invite context \u2014 'Jamie Park invited you to join Downtown location' \u2014 with no code/token entry or link-landing screen)",
+   "Swap request composer (choose which shift, choose a coworker or 'anyone qualified', optional note, confirm) \u2014 both 'Request swap' buttons (ShiftDetailScreen line 149, SwapScreen line 346) have no onClick and no destination",
+   "Incoming swap offers screen for teammates (a coworker must be able to see and accept/decline a swap offer before manager approval; SwapApprovals.jsx demo data implies this stage exists but no employee screen covers it)",
+   "My requests / request-status screen for employee (pending/approved/denied state for time-off requests, swap requests, and open-shift claims \u2014 currently only terminal notification cards exist)",
+   "Employee timesheet / hours history (TimeClockScreen is a stateless toggle; no past punches, weekly totals, or post-clock-out summary)",
+   "Employee edit profile / change password / phone number verification (ProfileScreen is read-only apart from notification switches)",
+   "Push-notification and location permission priming screens (product depends on push and geolocated clock-in per TimeClockScreen line 407, but there is no permission-request UX)",
+   "Employee full-schedule / calendar view (HomeScreen shows only a 3-item upcoming list; no week view, no past shifts, no view of the published week as a whole)"
+  ],
+  "missing_flows": [
+   "Manager first-run: sign up \u2192 create org \u2192 create location \u2192 define roles \u2192 invite staff. Zero screens exist for any step; the manager web app starts logged-in with seeded data.",
+   "Employee onboarding handoff: manager sends invite \u2192 employee receives link/text \u2192 lands on Accept invite. The manager-side invite creation and the employee-side link/code landing are both missing; only the middle screen (AcceptInviteScreen) exists, so the journey cannot start.",
+   "MVP loop step 2 (build with conflict warnings): conflicts exist only as pre-seeded demo data (status:'conflict' in INITIAL_SHIFTS, ManagerApp.jsx lines 32, 61). saveShift (lines 108-126) always writes status 'draft' or 'open' and never evaluates availability/overlap, and AssignShiftDialog shows a ConflictChip only for already-conflicted existing shifts (AssignShiftDialog.jsx lines 47-49). There is no designed moment where assigning an unavailable or double-booked employee produces a warning \u2014 the core MVP promise has no interaction design.",
+   "MVP loop step 2 (drag): readme promises 'manager drags shifts onto a week grid' but no drag-and-drop affordance exists anywhere; the only mechanism is click-cell \u2192 dialog. The interaction model is unresolved.",
+   "MVP loop steps 4-5 (publish \u2192 push/text \u2192 employee views): publish shows a toast, but there are no push/SMS message content designs, employee notifications are not tappable (no deep link from 'Schedule published' to the schedule), and the employee has no full-week schedule view to land on. The cross-app handoff is asserted in copy but not designed.",
+   "Phase-2 swap, end to end: employee taps 'Request swap' \u2192 DEAD END (no onClick, no composer) \u2192 teammate accept stage has no screen \u2192 manager approval exists (SwapApprovals.jsx) but Approve and Deny call the same decide() and just remove the row \u2192 resulting schedule change and employee notification are not shown. Only 1 of ~5 stages is designed.",
+   "Phase-2 open shifts, employee side of the loop: manager creates open shift (assign dialog with no employee) and approves claims \u2014 both exist \u2014 but after the employee taps 'Claim' (SwapScreen lines 329-331) the state is local-only ('Claimed'), with no pending-approval status, no approved/denied outcome surface, and no design for a denied claim.",
+   "Phase-2 time off, decision and downstream: employee request dialog exists, but manager Approve/Deny buttons in ManagerApp.jsx lines 219-221 have no onClick (no confirmation, no removal, no denial reason), the employee has no status view for a submitted request, and approved time off never surfaces in the schedule builder or AssignShiftDialog (no 'time off' conflict/indicator when scheduling Sam Torres during his approved Jul 14-16 trip).",
+   "Phase-2 time clock, manager side: employee can toggle clock in/out, but punches go nowhere \u2014 no manager timesheet review/edit/approve flow, so the time-clock feature cannot complete its purpose (payable hours).",
+   "Employee availability \u2192 manager scheduling handoff is lossy: AvailabilityScreen 'Advanced' mode captures per-day hour windows (EmployeeApp.jsx lines 212-240) but AvailabilityOverview renders only boolean day cells (AvailabilityOverview.jsx lines 29-46), and availability is not surfaced at all inside AssignShiftDialog's employee select. Also the employee screen has no Save/submit action or confirmation, so step 1 of the MVP loop has no completion state.",
+   "Forgot password on either app: no reset-request, email/SMS, or new-password screens; the employee link is dead text and the manager app has no login at all.",
+   "Add shift without a cell: the header 'Add shift' button (ManagerApp.jsx line 171) has no onClick and no variant of AssignShiftDialog with role/day pickers exists.",
+   "Multi-location: sidebar location control is a no-op and no picker/management screen exists, so a manager with two locations cannot switch or scope the schedule.",
+   "Manager logout / session end: no affordance exists on the web app."
+  ],
+  "gaps": [
+   {
+    "title": "No manager authentication or tenant bootstrap",
+    "severity": "blocker",
+    "detail": "ui_kits/manager-web/ contains no login, signup, or org/location creation. Combined with the missing invite-employee flow, neither user population can actually get into the product. Next.js implementation will need these screens designed or improvised from the form primitives."
+   },
+   {
+    "title": "Team management is read-only",
+    "severity": "blocker",
+    "detail": "ManagerApp.jsx 'team' view (lines 194-206) renders name/role/status cards only. No invite, add, edit, role-assign, wage, or deactivate. The employee app's AcceptInviteScreen references an invite that no manager screen can send."
+   },
+   {
+    "title": "Conflict detection has no trigger interaction",
+    "severity": "blocker",
+    "detail": "Conflicts are seeded demo data; saveShift never computes them and AssignShiftDialog neither checks availability nor warns on overlap when assigning. The MVP's central differentiator ('conflict warnings' per readme lines 5-6) has display components (ConflictChip, ShiftBlock conflict state, WeekGridCell dashed border) but no designed moment of appearance. Needs design for: warning inside AssignShiftDialog on selecting an unavailable/double-booked employee, and availability/time-off/overtime indicators in the employee Select."
+   },
+   {
+    "title": "Swap creation entirely missing",
+    "severity": "blocker",
+    "detail": "Both employee 'Request swap' buttons are inert (EmployeeApp.jsx lines 149 and 346). Phase-2's flagship feature cannot begin, making manager-side SwapApprovals unreachable in practice."
+   },
+   {
+    "title": "Drag-and-drop vs click-to-assign unresolved",
+    "severity": "major",
+    "detail": "readme.md line 5 promises drag; every screen implements click\u2192dialog. Either DnD interaction design (drag sources, drop targets, ghost states, mobile fallback) is missing, or the readme overstates and the click model should be canonized. Affects the core scheduling data model and component APIs."
+   },
+   {
+    "title": "Publish model is global and inconsistent",
+    "severity": "major",
+    "detail": "publish() in ManagerApp.jsx (lines 140-152) flips ALL drafts across ALL weeks; the Draft/Published badge is a single boolean while ScheduleView navigates arbitrary weeks. No per-week publish state, no republish-after-edit flow, no unpublish, no publish history. Copy inconsistency: confirm dialog says '5 employees will be notified' (line 256), success toast says '10 employees notified' (line 150)."
+   },
+   {
+    "title": "Free-text time entry with no validation states",
+    "severity": "major",
+    "detail": "AssignShiftDialog start/end are bare Inputs with placeholder '7:00 AM' (lines 57-64); AvailabilityScreen advanced hours are the same. No time-picker component, no invalid-format error state, no end-before-start handling. This is the primary data-entry surface of the whole product."
+   },
+   {
+    "title": "Header 'Add shift' button is dead",
+    "severity": "major",
+    "detail": "ManagerApp.jsx line 171: <Button variant=\"secondary\">Add shift</Button> has no onClick and no dialog variant with role/day pickers. Only the per-cell '+' path is designed."
+   },
+   {
+    "title": "Time-off approve/deny is non-functional and has no downstream design",
+    "severity": "major",
+    "detail": "ManagerApp.jsx lines 219-221: Deny/Approve have no handlers. No confirmation, no decided-state, no denial reason, no notification design, and approved time off is never reflected in the schedule grid, availability overview, or assign dialog."
+   },
+   {
+    "title": "Approve vs Deny indistinguishable in SwapApprovals",
+    "severity": "major",
+    "detail": "SwapApprovals.jsx line 13-15: decide(id) removes the row for both actions. No differentiated outcome, no denial reason, no resulting schedule mutation, no notification to the requester or the claimant."
+   },
+   {
+    "title": "No notification content designs for push/SMS",
+    "severity": "major",
+    "detail": "The MVP loop's 'pushed/texted' step has zero artifacts: no SMS copy templates, no push payload/preview designs, no phone-number verification step (phone is collected at invite, EmployeeApp.jsx line 71, but never verified \u2014 SMS delivery depends on it). In-app NOTIFICATIONS list is canned and cards are not tappable (no deep links, no read/unread, no bell badge count)."
+   },
+   {
+    "title": "Employee availability has no save/submit affordance",
+    "severity": "major",
+    "detail": "AvailabilityScreen (EmployeeApp.jsx lines 160-311) mutates local state with no Save button, no auto-save indicator, and no confirmation, so MVP-loop step 1 has no completion state. Also no effective-date concept (changes mid-published-week)."
+   },
+   {
+    "title": "Manager availability overview is lossy and unlinked",
+    "severity": "major",
+    "detail": "AvailabilityOverview.jsx shows boolean day cells only \u2014 the hour windows employees can set in 'Advanced' mode are dropped \u2014 and lists 5 hardcoded people vs the 10-person TEAM. No week context, no link into the schedule builder, and availability is absent from AssignShiftDialog where it is actually needed."
+   },
+   {
+    "title": "Time clock lacks everything around the toggle",
+    "severity": "major",
+    "detail": "TimeClockScreen (EmployeeApp.jsx lines 373-412): no association with the scheduled shift, no early/late clock-in rules, no elapsed timer, no breaks, no geofence-failure or location-permission-denied state (copy on line 407 promises location verification), no post-clock-out hours summary, and no persistence surface (timesheet) on either app."
+   },
+   {
+    "title": "Wage/labor-cost data has no input surface",
+    "severity": "major",
+    "detail": "Dashboard 'Projected labor cost $4,120' (DashboardScreen.jsx line 30) implies per-employee wages and hour math, but no screen collects wages. Either design wage entry in team-member edit or drop the stat from MVP."
+   },
+   {
+    "title": "Empty, loading, and error states almost entirely missing",
+    "severity": "major",
+    "detail": "Only SwapApprovals ('All caught up') and DayView ('No shifts scheduled') have empty states. Missing: Team empty, Time off empty, Notifications empty, employee Home with no shifts, Open shifts empty, dashboard all-clear, failed save, offline (critical for mobile clock-in), and any loading skeletons. No 404/500 pages for the web app."
+   },
+   {
+    "title": "Manager web has no responsive design",
+    "severity": "major",
+    "detail": "Fixed 232px sidebar (Sidebar.jsx line 15), 1440x860 target viewport (index.html dsCard), 110px+7x128px grid columns. Managers of hourly teams frequently manage from phones; there is no tablet/mobile layout or breakpoint guidance."
+   },
+   {
+    "title": "Open-shift claim feedback is misleading",
+    "severity": "major",
+    "detail": "SwapScreen 'Claim' flips to a disabled 'Claimed' button locally (EmployeeApp.jsx lines 329-331), implying success, but SwapApprovals copy says claims are 'Awaiting your approval'. Pending/approved/denied claim states need design on the employee side."
+   },
+   {
+    "title": "Icons and fonts are CDN-only",
+    "severity": "minor",
+    "detail": "readme index lists 'assets/icons/' but no assets/ directory exists in the export (verified via file listing); Lucide loads from unpkg and Figtree from Google Fonts. For the Next.js production app these must be self-hosted (bundle lucide-react, next/font) \u2014 also a CSP and offline concern. readme lines 135-142 and 153-155 acknowledge the substitution."
+   },
+   {
+    "title": "Shift status vocabulary incomplete",
+    "severity": "minor",
+    "detail": "ShiftBlock.jsx supports confirmed/open/conflict/draft only. No visual state for swap-pending, claim-pending, covered-by-someone-else, or shift-during-approved-time-off, all of which phase-2 flows produce."
+   },
+   {
+    "title": "Team status dots lack legend and semantics",
+    "severity": "minor",
+    "detail": "AvatarStatus statuses (available/unavailable/pending/off) render as colored dots in the Team list with no legend; 'pending' presumably means invite-pending but that lifecycle is undefined anywhere."
+   },
+   {
+    "title": "Demo date model leaks into design",
+    "severity": "minor",
+    "detail": "ScheduleView.jsx anchors to hardcoded ANCHOR = July 6 2026 and keys shifts by 'Mon 6' strings (dayKeyOf), which collide across months in MonthView counts. Harmless as a mock, but signals that real date/timezone modeling is undesigned (week-start config, DST, multi-week data)."
+   },
+   {
+    "title": "Publish confirmation is toast-only",
+    "severity": "minor",
+    "detail": "The 3.5s auto-dismiss toast (ManagerApp.jsx lines 150-151) is the only record of publishing; no publish history/audit or 'last published' timestamp on the schedule header."
+   },
+   {
+    "title": "Employee login is password-only despite phone-first field",
+    "severity": "minor",
+    "detail": "LoginScreen label is 'Phone or email' but the only path is password. Hourly, SMS-first workforce suggests an OTP/magic-link option; at minimum the phone-login behavior is undefined."
+   },
+   {
+    "title": "Accessibility: interactive divs throughout",
+    "severity": "minor",
+    "detail": "Sidebar nav items, mobile tab bar, clock in/out circle, week-grid '+ Add' targets, and dashboard cards are onClick divs, not buttons \u2014 no keyboard/focus semantics. The kit's focus-ring tokens exist but screens do not use focusable elements. An implementation-time fix, but worth flagging so the wiring pass adds proper semantics."
+   },
+   {
+    "title": "No legal/compliance touchpoints",
+    "severity": "minor",
+    "detail": "AcceptInviteScreen collects name/phone/password with no terms-of-service, privacy policy, or SMS-consent language (SMS consent is legally required for texting schedules in the US under TCPA)."
+   },
+   {
+    "title": "No location detail for employees",
+    "severity": "minor",
+    "detail": "ShiftDetailScreen shows the location name only; no address or map link for employees who work multiple sites."
+   }
+  ],
+  "notes": "Verified screen inventory (all claims checked in JSX, not the readme). Manager web (\"/Users/gary/dev/RosterHouse/RosterHouse Design System/ui_kits/manager-web/\"): ManagerApp.jsx shell with Dashboard (DashboardScreen.jsx), Schedule (ScheduleView.jsx day/week/month + WeekGrid.jsx + AssignShiftDialog.jsx + publish confirm dialog + success toast), Team (inline, read-only), Availability (AvailabilityOverview.jsx, read-only), Time off (inline, 2 pending cards, inert buttons), Swaps & open shifts (SwapApprovals.jsx). Employee mobile (\"/Users/gary/dev/RosterHouse/RosterHouse Design System/ui_kits/employee-mobile/EmployeeApp.jsx\"): Login, Accept invite, Home/My shifts, Shift detail, Availability (simple/advanced + time-off request dialog), Time clock, Open shifts/Swap, Notifications, Profile (notification prefs + logout). The readme's screen list is accurate about what exists but overstates completeness: 'drags shifts' (no DnD), 'conflict warnings' (display-only, never triggered), 'swap requests' (button exists, flow does not). readme.md lines 158-160 already self-report the biggest structural absences (onboarding wizard, multi-location, billing, phase-3 surfaces); this analysis confirms them plus the manager-auth, invite-send, swap-composer, and timesheet holes it does not mention. Severity philosophy used: blocker = an MVP-loop or phase-2 feature cannot function or users cannot enter the system; major = a designed flow dead-ends, misleads, or requires inventing significant UI at implementation time; minor = polish, semantics, or production-hardening. For the Next.js wiring step, the four blockers (auth+bootstrap, team management/invites, conflict-trigger design, swap composer) require net-new screen design before implementation can proceed; everything else can be built from existing primitives (Dialog, Select, Input, Tabs, Card, Badge) with design decisions made inline."
+ },
+ "dataModel": {
+  "entities": [
+   {
+    "name": "Organization",
+    "fields": [
+     "id: string (cuid, PK)",
+     "name: string",
+     "createdAt: DateTime"
+    ],
+    "relations": [
+     "hasMany Location",
+     "hasMany User",
+     "hasMany Invite"
+    ],
+    "source_screens": [
+     "Manager Sidebar (RosterHouse brand chrome)",
+     "readme.md (multi-location + org onboarding listed as not-yet-built, implying org root)"
+    ]
+   },
+   {
+    "name": "Location",
+    "fields": [
+     "id: string (PK)",
+     "organizationId: string (FK Organization)",
+     "name: string (e.g. 'Downtown location')",
+     "timezone: string (IANA, e.g. 'America/Chicago' \u2014 all shift times render as local 12-hour clock)",
+     "address: string?",
+     "createdAt: DateTime"
+    ],
+    "relations": [
+     "belongsTo Organization",
+     "hasMany Position",
+     "hasMany EmployeeProfile",
+     "hasMany Schedule",
+     "hasMany Shift",
+     "hasMany Invite",
+     "hasMany TimeClockEntry"
+    ],
+    "source_screens": [
+     "Manager Sidebar (location switcher with chevron \u2014 multi-location implied)",
+     "Employee Shift Detail (map-pin + 'Downtown location')",
+     "Employee Accept Invite ('join Downtown location')",
+     "Employee Profile ('Line cook \u00b7 Downtown location')",
+     "Employee Time Clock ('Clocked in for Line cook \u00b7 Downtown location')"
+    ]
+   },
+   {
+    "name": "User",
+    "fields": [
+     "id: string (PK)",
+     "organizationId: string (FK Organization)",
+     "name: string",
+     "email: string? (unique \u2014 login accepts 'Phone or email')",
+     "phone: string? (unique \u2014 login + invite collect phone; SMS notifications sent)",
+     "passwordHash: string",
+     "role: enum('manager','employee')",
+     "createdAt: DateTime"
+    ],
+    "relations": [
+     "belongsTo Organization",
+     "hasMany EmployeeProfile (membership per location)",
+     "hasMany Notification",
+     "hasMany Invite (as inviter)"
+    ],
+    "source_screens": [
+     "Employee Login (phone-or-email + password, forgot password)",
+     "Employee Accept Invite (full name, phone, create password)",
+     "Manager Sidebar (Jamie Park avatar footer)",
+     "Manager Dashboard ('Good afternoon, Jamie')",
+     "Employee Profile"
+    ]
+   },
+   {
+    "name": "EmployeeProfile",
+    "fields": [
+     "id: string (PK)",
+     "userId: string (FK User)",
+     "locationId: string (FK Location)",
+     "positionId: string (FK Position \u2014 primary role shown everywhere, e.g. 'Maria Garcia / Line cook')",
+     "hourlyRate: Decimal? (needed for Dashboard 'Projected labor cost $4,120')",
+     "status: enum('invited','active','inactive')",
+     "notifyPush: boolean (default true)",
+     "notifySms: boolean (default true)",
+     "notifyEmail: boolean (default false)"
+    ],
+    "relations": [
+     "belongsTo User",
+     "belongsTo Location",
+     "belongsTo Position",
+     "hasMany Shift (as assignee)",
+     "hasMany AvailabilityRule",
+     "hasMany TimeOffRequest",
+     "hasMany SwapRequest",
+     "hasMany OpenShiftClaim",
+     "hasMany TimeClockEntry"
+    ],
+    "source_screens": [
+     "Manager Team (AvatarStatus name + role + status dot: available/unavailable/pending/off)",
+     "Employee Profile (name, role \u00b7 location, notification preference switches for push/SMS/email)",
+     "Manager Dashboard (labor cost stat)",
+     "AssignShiftDialog (employee picker)"
+    ]
+   },
+   {
+    "name": "Invite",
+    "fields": [
+     "id: string (PK)",
+     "organizationId: string (FK)",
+     "locationId: string (FK \u2014 invite is to a location: 'join Downtown location')",
+     "invitedByUserId: string (FK User \u2014 'Jamie Park invited you')",
+     "positionId: string? (FK Position \u2014 role likely pre-assigned by manager)",
+     "phone: string? (invites delivered by text per product loop)",
+     "email: string?",
+     "token: string (unique \u2014 deep-link into Accept Invite screen)",
+     "status: enum('pending','accepted','expired')",
+     "expiresAt: DateTime?",
+     "createdAt: DateTime"
+    ],
+    "relations": [
+     "belongsTo Organization",
+     "belongsTo Location",
+     "belongsTo User (inviter)"
+    ],
+    "source_screens": [
+     "Employee Accept Invite (shows inviter name + location; collects name/phone/password \u2192 'Join team')",
+     "Employee Login ('New here? Accept your invite')"
+    ]
+   },
+   {
+    "name": "Position",
+    "fields": [
+     "id: string (PK)",
+     "locationId: string (FK Location)",
+     "name: string (e.g. 'Line cook','Server','Dishwasher','Host')",
+     "sortOrder: int (week grid renders positions as fixed ordered rows)",
+     "createdAt: DateTime"
+    ],
+    "relations": [
+     "belongsTo Location",
+     "hasMany Shift",
+     "hasMany EmployeeProfile"
+    ],
+    "source_screens": [
+     "Manager Schedule Builder / WeekGrid (ROLES = row axis of grid)",
+     "AssignShiftDialog ('Line cook \u00b7 Mon 6' context)",
+     "ShiftBlock (role label)",
+     "Manager Team (role under name)",
+     "Employee Home/Shift Detail (role headline)"
+    ]
+   },
+   {
+    "name": "Schedule",
+    "fields": [
+     "id: string (PK)",
+     "locationId: string (FK Location)",
+     "weekStartDate: Date (Monday \u2014 grid and month view are Monday-first)",
+     "status: enum('draft','published')",
+     "publishedAt: DateTime?",
+     "publishedByUserId: string? (FK User)",
+     "createdAt: DateTime",
+     "@@unique([locationId, weekStartDate])"
+    ],
+    "relations": [
+     "belongsTo Location",
+     "hasMany Shift"
+    ],
+    "source_screens": [
+     "Manager Schedule Builder (Draft/Published Badge in header; 'Publish schedule' button; publish confirm dialog '5 employees will be notified by push and text')",
+     "Employee Notifications ('Your manager published next week's schedule')"
+    ]
+   },
+   {
+    "name": "Shift",
+    "fields": [
+     "id: string (PK)",
+     "scheduleId: string (FK Schedule)",
+     "locationId: string (FK Location, denormalized for range queries)",
+     "positionId: string (FK Position)",
+     "employeeProfileId: string? (FK EmployeeProfile \u2014 NULL = open shift; AssignShiftDialog placeholder is 'Open shift (unassigned)')",
+     "date: Date (location-local service date)",
+     "startsAt: DateTime (UTC instant, derived from local time + Location.timezone)",
+     "endsAt: DateTime (UTC \u2014 shifts cross midnight in the data, e.g. '5:00 PM \u2013 12:00 AM', '6:00 PM \u2013 12:00 AM')",
+     "status: enum('draft','published') \u2014 UI ShiftBlock status enum is 'confirmed'|'open'|'conflict'|'draft': 'confirmed' = published+assigned, 'open' = employeeProfileId null, 'conflict' is DERIVED at read time (do not store)",
+     "notes: string? ('Bring your own knife kit.', 'Inventory count at close.')",
+     "createdAt: DateTime",
+     "updatedAt: DateTime"
+    ],
+    "relations": [
+     "belongsTo Schedule",
+     "belongsTo Location",
+     "belongsTo Position",
+     "belongsTo EmployeeProfile (nullable)",
+     "hasMany SwapRequest",
+     "hasMany OpenShiftClaim",
+     "hasMany TimeClockEntry",
+     "derived: coworkers = other assigned shifts overlapping same location+date",
+     "derived: conflictReason string per readme/ConflictChip (double-booked, outside availability, overtime)"
+    ],
+    "source_screens": [
+     "Manager Schedule Builder week/day/month views (ShiftBlock, WeekGridCell)",
+     "AssignShiftDialog (employee select, start/end time inputs, Remove)",
+     "Employee Home (upcoming shifts + '3 shifts \u00b7 24 hrs total' summary)",
+     "Employee Shift Detail (day, role, time, status badge, location, coworkers, manager note)",
+     "Employee Open Shifts (claimable open shifts)",
+     "Manager Dashboard ('2 shifts have conflicts', 'Coverage gaps this week')"
+    ]
+   },
+   {
+    "name": "AvailabilityRule",
+    "fields": [
+     "id: string (PK)",
+     "employeeProfileId: string (FK EmployeeProfile)",
+     "dayOfWeek: int (0=Mon..6=Sun, matching UI order)",
+     "isAvailable: boolean (simple mode toggle)",
+     "startTime: string? ('09:00' local \u2014 advanced mode per-day window)",
+     "endTime: string? ('17:00' local)",
+     "updatedAt: DateTime",
+     "@@unique([employeeProfileId, dayOfWeek]) \u2014 'repeats every week until you change it' (recurring weekly, no per-week versioning in MVP)"
+    ],
+    "relations": [
+     "belongsTo EmployeeProfile"
+    ],
+    "source_screens": [
+     "Employee Availability (simple day switches, advanced per-day start/end inputs, presets every-day/weekdays/weekends)",
+     "Manager Availability Overview (employees \u00d7 Mon\u2013Sun boolean grid)",
+     "ConflictChip semantics ('outside availability' conflict type per readme)"
+    ]
+   },
+   {
+    "name": "TimeOffRequest",
+    "fields": [
+     "id: string (PK)",
+     "employeeProfileId: string (FK EmployeeProfile)",
+     "startDate: Date",
+     "endDate: Date (single-day requests shown as one date, e.g. 'Jul 20')",
+     "reason: enum('vacation','sick','personal','other')",
+     "note: string? (free text required-ish when reason='other': 'Tell your manager why')",
+     "status: enum('pending','approved','denied')",
+     "decidedByUserId: string? (FK User)",
+     "decidedAt: DateTime?",
+     "createdAt: DateTime"
+    ],
+    "relations": [
+     "belongsTo EmployeeProfile",
+     "belongsTo User (decider)"
+    ],
+    "source_screens": [
+     "Employee Availability \u2192 Request time off dialog (start/end date, reason select, other-note textarea, 'push notification once approved or denied')",
+     "Manager Time off approvals (name, 'Jul 14 \u2013 Jul 16 \u00b7 Family trip', Approve/Deny)",
+     "Manager Dashboard ('2 time-off requests waiting', 'Pending requests' stat)"
+    ]
+   },
+   {
+    "name": "SwapRequest",
+    "fields": [
+     "id: string (PK)",
+     "shiftId: string (FK Shift \u2014 the shift being given up)",
+     "requestingEmployeeProfileId: string (FK EmployeeProfile)",
+     "coveringEmployeeProfileId: string? (FK EmployeeProfile \u2014 NULL = 'Open to anyone qualified'; set when a teammate agrees to cover, e.g. 'Sam Torres will cover your Fri shift')",
+     "note: string?",
+     "status: enum('pending','approved','denied','cancelled')",
+     "decidedByUserId: string? (FK User \u2014 manager approval required: 'Approve shift swaps and claims before they take effect')",
+     "decidedAt: DateTime?",
+     "createdAt: DateTime"
+    ],
+    "relations": [
+     "belongsTo Shift",
+     "belongsTo EmployeeProfile (requester)",
+     "belongsTo EmployeeProfile (coverer, nullable)"
+    ],
+    "source_screens": [
+     "Employee Shift Detail ('Request swap' button)",
+     "Employee Open Shifts screen ('Request swap' on my shifts)",
+     "Manager Swaps & open shifts ('Priya Shah wants to swap her Sat Jul 12, 4\u201310 PM Server shift \u00b7 Open to anyone qualified', Approve/Deny)",
+     "Manager Dashboard ('1 swap request')",
+     "Employee Notifications ('Swap request approved \u2014 Sam Torres will cover your Fri shift')"
+    ]
+   },
+   {
+    "name": "OpenShiftClaim",
+    "fields": [
+     "id: string (PK)",
+     "shiftId: string (FK Shift \u2014 an open/unassigned shift)",
+     "employeeProfileId: string (FK EmployeeProfile \u2014 claimer)",
+     "status: enum('pending','approved','denied')",
+     "decidedByUserId: string? (FK User)",
+     "decidedAt: DateTime?",
+     "createdAt: DateTime"
+    ],
+    "relations": [
+     "belongsTo Shift",
+     "belongsTo EmployeeProfile",
+     "on approve: Shift.employeeProfileId is set to claimer"
+    ],
+    "source_screens": [
+     "Employee Open Shifts ('Claim' button \u2192 'Claimed' pending state)",
+     "Manager Swaps & open shifts ('Sun Jul 13, 6 PM\u201312 AM Dishwasher \u2014 claimed by Alex Kim \u00b7 Awaiting your approval', Approve/Deny)"
+    ]
+   },
+   {
+    "name": "TimeClockEntry",
+    "fields": [
+     "id: string (PK)",
+     "employeeProfileId: string (FK EmployeeProfile)",
+     "shiftId: string? (FK Shift \u2014 the shift being worked, matched by time/role)",
+     "locationId: string (FK Location)",
+     "clockInAt: DateTime",
+     "clockOutAt: DateTime? (NULL = currently clocked in)",
+     "clockInLat: Decimal? / clockInLng: Decimal? ('Uses your phone's location to confirm you're on-site')",
+     "clockOutLat: Decimal? / clockOutLng: Decimal?",
+     "createdAt: DateTime"
+    ],
+    "relations": [
+     "belongsTo EmployeeProfile",
+     "belongsTo Shift (nullable)",
+     "belongsTo Location"
+    ],
+    "source_screens": [
+     "Employee Time Clock (clock in/out toggle, 'Clocked in for Line cook \u00b7 Downtown location', geolocation caption)",
+     "Manager Dashboard ('Clocked in now' stat + card list of clocked-in employees)"
+    ]
+   },
+   {
+    "name": "Notification",
+    "fields": [
+     "id: string (PK)",
+     "userId: string (FK User)",
+     "type: enum('schedule_published','shift_reminder','swap_approved','swap_denied','timeoff_approved','timeoff_denied','claim_approved','claim_denied','open_shift_posted') \u2014 first three directly evidenced, rest implied by approval flows' 'you'll get a push notification' copy",
+     "title: string ('Schedule published')",
+     "body: string ('Your manager published next week's schedule.')",
+     "tone: enum('success','info','warning') (UI Badge tone on Notifications screen)",
+     "readAt: DateTime? (bell icon implies unread state)",
+     "channelsSent: string[] ('push','sms','email' \u2014 publish toast: 'notified by push and text')",
+     "createdAt: DateTime"
+    ],
+    "relations": [
+     "belongsTo User"
+    ],
+    "source_screens": [
+     "Employee Notifications (title/body/tone/relative time)",
+     "Employee Home (bell icon in TopBar)",
+     "Manager publish flow (toast 'Schedule published \u2014 10 employees notified by push and text')",
+     "Employee Time-off dialog copy ('You'll get a push notification once it's approved or denied')",
+     "Employee Profile (channel preference switches)"
+    ]
+   },
+   {
+    "name": "PushDevice",
+    "fields": [
+     "id: string (PK)",
+     "userId: string (FK User)",
+     "token: string (unique \u2014 web push subscription or FCM/APNs token)",
+     "platform: string",
+     "createdAt: DateTime"
+    ],
+    "relations": [
+     "belongsTo User"
+    ],
+    "source_screens": [
+     "IMPLIED ONLY \u2014 no screen renders it, but push delivery (publish toast, time-off dialog copy, profile push toggle) requires device/subscription registration"
+    ]
+   }
+  ],
+  "endpoints": [
+   {
+    "method": "POST",
+    "path": "/api/auth/login",
+    "purpose": "Authenticate with phone-or-email + password; sets session cookie. Same endpoint serves manager web login (implied) and employee mobile web.",
+    "screens": [
+     "Employee: Login"
+    ]
+   },
+   {
+    "method": "POST",
+    "path": "/api/auth/logout",
+    "purpose": "Destroy session.",
+    "screens": [
+     "Employee: Profile ('Log out')",
+     "Manager: Sidebar (implied)"
+    ]
+   },
+   {
+    "method": "POST",
+    "path": "/api/auth/forgot-password",
+    "purpose": "Start password reset via email/SMS.",
+    "screens": [
+     "Employee: Login ('Forgot password?')"
+    ]
+   },
+   {
+    "method": "GET",
+    "path": "/api/auth/session",
+    "purpose": "Bootstrap current user, role, org, and location memberships for both apps.",
+    "screens": [
+     "Manager: all (Sidebar greeting/avatar)",
+     "Employee: all ('Hi, Maria')"
+    ]
+   },
+   {
+    "method": "GET",
+    "path": "/api/invites/[token]",
+    "purpose": "Resolve invite token \u2192 inviter name, location name, org, pre-assigned position (renders the invite pitch).",
+    "screens": [
+     "Employee: Accept Invite"
+    ]
+   },
+   {
+    "method": "POST",
+    "path": "/api/invites/[token]/accept",
+    "purpose": "Accept invite: body {name, phone, password} \u2192 create User + EmployeeProfile, mark invite accepted, start session.",
+    "screens": [
+     "Employee: Accept Invite ('Join team')"
+    ]
+   },
+   {
+    "method": "POST",
+    "path": "/api/locations/[locationId]/invites",
+    "purpose": "Manager creates/sends an invite (text/email) for a new employee. No dedicated screen in kit but required to make the accept flow work; belongs on Team screen.",
+    "screens": [
+     "Manager: Team (implied)"
+    ]
+   },
+   {
+    "method": "GET",
+    "path": "/api/locations",
+    "purpose": "List locations the current user manages/belongs to (location switcher; multi-location is roadmap but the switcher UI exists).",
+    "screens": [
+     "Manager: Sidebar (location pill with chevron)"
+    ]
+   },
+   {
+    "method": "GET",
+    "path": "/api/locations/[locationId]/positions",
+    "purpose": "List positions/roles \u2014 row axis of the week grid and role context in dialogs.",
+    "screens": [
+     "Manager: Schedule Builder (WeekGrid rows)",
+     "Manager: Assign Shift Dialog"
+    ]
+   },
+   {
+    "method": "GET",
+    "path": "/api/locations/[locationId]/team",
+    "purpose": "List EmployeeProfiles with name, position, and live status (available/unavailable/pending/off) for team list and employee picker.",
+    "screens": [
+     "Manager: Team",
+     "Manager: Assign Shift Dialog (Employee select)",
+     "Manager: Availability Overview (row names)"
+    ]
+   },
+   {
+    "method": "GET",
+    "path": "/api/locations/[locationId]/dashboard",
+    "purpose": "Aggregated stats: coverage gaps this week, pending request count (time-off + swaps + claims), projected labor cost (hourlyRate \u00d7 scheduled hrs), clocked-in-now list, conflict count.",
+    "screens": [
+     "Manager: Dashboard"
+    ]
+   },
+   {
+    "method": "GET",
+    "path": "/api/locations/[locationId]/schedule?weekStart=YYYY-MM-DD",
+    "purpose": "Fetch (or lazily create draft) the week's Schedule with all Shifts, each annotated with derived UI status (draft/confirmed/open/conflict) and conflictReason strings; includes schedule draft/published badge state.",
+    "screens": [
+     "Manager: Schedule Builder (week + day views)",
+     "Manager: Dashboard (conflict card)"
+    ]
+   },
+   {
+    "method": "GET",
+    "path": "/api/locations/[locationId]/shifts?from=YYYY-MM-DD&to=YYYY-MM-DD",
+    "purpose": "Arbitrary date-range shift counts/summaries for the month view (42-day grid spans multiple weeks/schedules).",
+    "screens": [
+     "Manager: Schedule Builder (Month view badges)"
+    ]
+   },
+   {
+    "method": "POST",
+    "path": "/api/shifts",
+    "purpose": "Create a shift: {locationId, date, positionId, startTime, endTime, employeeProfileId? (null = open shift), notes?}. New shifts are status=draft (assigned) or open (unassigned). Response includes any conflicts detected.",
+    "screens": [
+     "Manager: Assign Shift Dialog (Save, from empty cell / '+ Add')"
+    ]
+   },
+   {
+    "method": "PATCH",
+    "path": "/api/shifts/[shiftId]",
+    "purpose": "Edit shift time/assignee/notes; re-runs conflict detection and returns updated conflictReason.",
+    "screens": [
+     "Manager: Assign Shift Dialog (Edit shift \u2192 Save)"
+    ]
+   },
+   {
+    "method": "DELETE",
+    "path": "/api/shifts/[shiftId]",
+    "purpose": "Remove a shift from the grid.",
+    "screens": [
+     "Manager: Assign Shift Dialog ('Remove')"
+    ]
+   },
+   {
+    "method": "POST",
+    "path": "/api/shifts/validate",
+    "purpose": "Dry-run conflict check for a proposed shift (double-booked / outside availability / overtime) so the dialog can warn before save.",
+    "screens": [
+     "Manager: Assign Shift Dialog (ConflictChip with reason)"
+    ]
+   },
+   {
+    "method": "POST",
+    "path": "/api/schedules/[scheduleId]/publish",
+    "purpose": "Publish the week: flips schedule + draft shifts to published/confirmed, fans out push + SMS notifications to affected employees, returns notified count ('10 employees notified by push and text').",
+    "screens": [
+     "Manager: Schedule Builder (Publish dialog + success toast)"
+    ]
+   },
+   {
+    "method": "GET",
+    "path": "/api/locations/[locationId]/availability",
+    "purpose": "Team availability matrix (employee \u00d7 Mon\u2013Sun, with hours) for building next week's schedule.",
+    "screens": [
+     "Manager: Availability Overview"
+    ]
+   },
+   {
+    "method": "GET",
+    "path": "/api/me/availability",
+    "purpose": "Current employee's weekly recurring availability rules (7 days, isAvailable + optional start/end).",
+    "screens": [
+     "Employee: Availability"
+    ]
+   },
+   {
+    "method": "PUT",
+    "path": "/api/me/availability",
+    "purpose": "Replace all 7 weekly availability rules in one write (simple toggles, advanced hours, presets all save the full week).",
+    "screens": [
+     "Employee: Availability"
+    ]
+   },
+   {
+    "method": "POST",
+    "path": "/api/time-off",
+    "purpose": "Create time-off request {startDate, endDate, reason: vacation|sick|personal|other, note?}; notifies manager.",
+    "screens": [
+     "Employee: Availability \u2192 Request time off dialog ('Send request')"
+    ]
+   },
+   {
+    "method": "GET",
+    "path": "/api/locations/[locationId]/time-off?status=pending",
+    "purpose": "List pending time-off requests with employee, date range, reason for review.",
+    "screens": [
+     "Manager: Time off approvals",
+     "Manager: Dashboard ('2 time-off requests waiting')"
+    ]
+   },
+   {
+    "method": "PATCH",
+    "path": "/api/time-off/[requestId]",
+    "purpose": "Approve or deny: {status: 'approved'|'denied'}; records decider, sends push notification to employee.",
+    "screens": [
+     "Manager: Time off approvals (Approve/Deny buttons)"
+    ]
+   },
+   {
+    "method": "GET",
+    "path": "/api/me/shifts?from=&to=",
+    "purpose": "Employee's upcoming shifts with status, plus week summary aggregates (shift count, total hrs) for the hero card.",
+    "screens": [
+     "Employee: Home/My Shifts ('3 shifts \u00b7 24 hrs total')",
+     "Employee: Open Shifts (My shifts section)"
+    ]
+   },
+   {
+    "method": "GET",
+    "path": "/api/shifts/[shiftId]",
+    "purpose": "Full shift detail for the employee: time, status, location name, coworkers on overlapping shifts, manager notes.",
+    "screens": [
+     "Employee: Shift Detail"
+    ]
+   },
+   {
+    "method": "GET",
+    "path": "/api/open-shifts",
+    "purpose": "Open (unassigned, published) shifts at the employee's location that they can claim; includes claimed-pending state for the current user.",
+    "screens": [
+     "Employee: Open Shifts ('Claim'/'Claimed')"
+    ]
+   },
+   {
+    "method": "POST",
+    "path": "/api/open-shifts/[shiftId]/claims",
+    "purpose": "Employee claims an open shift \u2192 OpenShiftClaim pending manager approval; button flips to disabled 'Claimed'.",
+    "screens": [
+     "Employee: Open Shifts ('Claim')"
+    ]
+   },
+   {
+    "method": "POST",
+    "path": "/api/shifts/[shiftId]/swap-requests",
+    "purpose": "Employee requests a swap/cover on their own shift {coveringEmployeeProfileId?, note?} \u2014 null coverer = open to anyone qualified.",
+    "screens": [
+     "Employee: Shift Detail ('Request swap')",
+     "Employee: Open Shifts ('Request swap')"
+    ]
+   },
+   {
+    "method": "GET",
+    "path": "/api/locations/[locationId]/approvals?status=pending",
+    "purpose": "Combined pending queue of SwapRequests and OpenShiftClaims (the screen renders both types in one list with Swap/Open shift badges).",
+    "screens": [
+     "Manager: Swaps & open shifts",
+     "Manager: Dashboard ('1 swap request')"
+    ]
+   },
+   {
+    "method": "PATCH",
+    "path": "/api/swap-requests/[requestId]",
+    "purpose": "Approve/deny a swap: on approve, reassign shift to coverer (or convert to open shift), notify requester ('Sam Torres will cover your Fri shift').",
+    "screens": [
+     "Manager: Swaps & open shifts (Approve/Deny)"
+    ]
+   },
+   {
+    "method": "PATCH",
+    "path": "/api/open-shift-claims/[claimId]",
+    "purpose": "Approve/deny an open-shift claim: on approve, assign shift to claimer and notify them.",
+    "screens": [
+     "Manager: Swaps & open shifts (Approve/Deny on 'claimed by Alex Kim')"
+    ]
+   },
+   {
+    "method": "GET",
+    "path": "/api/me/time-clock",
+    "purpose": "Current clock state (active TimeClockEntry with shift/role/location, or none) to render the clock-in vs clock-out button.",
+    "screens": [
+     "Employee: Time Clock"
+    ]
+   },
+   {
+    "method": "POST",
+    "path": "/api/time-clock/clock-in",
+    "purpose": "Clock in {lat, lng} \u2014 server verifies geolocation against Location, matches current shift, creates TimeClockEntry.",
+    "screens": [
+     "Employee: Time Clock"
+    ]
+   },
+   {
+    "method": "POST",
+    "path": "/api/time-clock/clock-out",
+    "purpose": "Clock out {lat, lng} \u2014 closes the active TimeClockEntry.",
+    "screens": [
+     "Employee: Time Clock"
+    ]
+   },
+   {
+    "method": "GET",
+    "path": "/api/me/notifications",
+    "purpose": "In-app notification feed (title, body, tone, relative time), newest first; unread count for the bell.",
+    "screens": [
+     "Employee: Notifications",
+     "Employee: Home (bell icon)"
+    ]
+   },
+   {
+    "method": "POST",
+    "path": "/api/me/notifications/read",
+    "purpose": "Mark notifications read (all, or {ids}) when the feed is opened.",
+    "screens": [
+     "Employee: Notifications (implied by bell/unread state)"
+    ]
+   },
+   {
+    "method": "GET",
+    "path": "/api/me",
+    "purpose": "Profile: name, position, location, notification channel preferences.",
+    "screens": [
+     "Employee: Profile"
+    ]
+   },
+   {
+    "method": "PATCH",
+    "path": "/api/me/notification-preferences",
+    "purpose": "Toggle push/SMS/email channels {notifyPush?, notifySms?, notifyEmail?}.",
+    "screens": [
+     "Employee: Profile (three switches)"
+    ]
+   },
+   {
+    "method": "POST",
+    "path": "/api/me/devices",
+    "purpose": "Register a web-push subscription/device token so publish/approval pushes can be delivered (implied \u2014 no screen, but required by every 'you'll get a push' promise).",
+    "screens": [
+     "Employee: Profile (push toggle, implied)",
+     "Employee: Login (post-login, implied)"
+    ]
+   }
+  ],
+  "notes": "MULTI-TENANCY: Two-level tenancy Organization \u2192 Location. Every domain row carries organizationId (directly or via Location); Positions, Schedules, Shifts, Availability, and all request queues are Location-scoped. The manager Sidebar renders a clickable location pill ('Downtown location' + chevron), so model users as having multiple location memberships (EmployeeProfile per location) even though the switcher UI is a stub \u2014 readme explicitly flags multi-location switching and org/location onboarding as not-yet-built screens. Enforce tenancy in every API handler (session \u2192 org \u2192 location membership check), not just in the UI.\n\nTIMEZONES: Store an IANA timezone on Location (the single source of truth for wall-clock rendering). Shifts should persist UTC instants (startsAt/endsAt) PLUS a location-local service `date`, because (a) the grid is keyed by local day ('Mon 6'), (b) demo data includes shifts crossing midnight ('5:00 PM \u2013 12:00 AM', '6:00 PM \u2013 12:00 AM') which belong to the starting day's column, and (c) the readme mandates 12-hour clock display ('7:00 AM\u20133:00 PM', never military time) and spelled-out durations ('8 hrs', '24 hrs total'). Week starts Monday (grid and month view are Monday-first). Time inputs in the kit are free-text 12-hour strings \u2014 the API should accept/normalize 'h:mm AM/PM'.\n\nDERIVED-NOT-STORED: (1) Shift 'conflict' status and conflictReason are computed server-side per readme/ConflictChip semantics \u2014 double-booked (overlapping shifts same employee same day, evidenced by 'Overlaps Sam's 2\u20136 PM Server shift the same day'), outside availability, and overtime. Do not persist a conflict flag; recompute on schedule reads and shift writes (hence the /api/shifts/validate dry-run for the dialog). (2) 'Open shift' = Shift.employeeProfileId IS NULL (AssignShiftDialog's employee placeholder is literally 'Open shift (unassigned)'). (3) UI ShiftBlock status mapping: draft = assigned + schedule/shift unpublished; confirmed = published + assigned; open = null assignee; conflict = computed overlay. (4) Employee coworkers list on Shift Detail = other assigned shifts overlapping the same location/date. (5) Dashboard stats (coverage gaps, projected labor cost, pending counts, clocked-in-now) are aggregates; labor cost requires an hourlyRate field on EmployeeProfile that no screen edits \u2014 flag as a needed settings/team-edit surface. (6) AvatarStatus dot (available/unavailable/pending/off) is derived from availability rules + approved time off + invite status.\n\nPUBLISH FLOW: Publishing is the key transactional write \u2014 flip Schedule.status and all draft shifts to published atomically, then fan out Notification rows + push/SMS sends to distinct affected employees, returning the notified count for the toast. Notification copy differs by channel prefs (Profile switches: push/SMS on by default, email off).\n\nEVIDENCE GAPS / INTENTIONAL OMISSIONS: No screens exist for org/location onboarding, billing, manager settings, position CRUD, employee time-off history, or reporting (readme lists these as phase-3/not built) \u2014 endpoints above cover only what the screens need plus minimal implied auth/invite plumbing. SwapRequest peer-acceptance (a teammate volunteering before manager approval) is implied by 'Sam Torres will cover your Fri shift' but has no screen; modeled as nullable coveringEmployeeProfileId settable before approval. Auth screens exist only in the employee kit; the manager web app needs the same login (role='manager') \u2014 no separate manager signup screen exists."
+ },
+ "critic": {
+  "missed_files": [
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/uploads/pasted-1783291965045-0.png",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/containers/Card.prompt.md",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/containers/Dialog.prompt.md",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/containers/Tabs.prompt.md",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/feedback/Badge.prompt.md",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/feedback/Tag.prompt.md",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/feedback/Toast.prompt.md",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/feedback/Tooltip.prompt.md",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/forms/Checkbox.prompt.md",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/forms/Input.prompt.md",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/forms/Select.prompt.md",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/forms/Switch.prompt.md",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/scheduling/AvatarStatus.prompt.md",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/scheduling/ConflictChip.prompt.md",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/scheduling/ShiftBlock.prompt.md",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/scheduling/WeekGridCell.prompt.md",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/guidelines/brand-wordmark.html",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/guidelines/colors-accent.html",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/guidelines/colors-neutral.html",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/guidelines/colors-primary.html",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/guidelines/colors-semantic.html",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/guidelines/colors-surfaces.html",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/guidelines/effects-motion.html",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/guidelines/effects-radius.html",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/guidelines/effects-shadow.html",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/guidelines/spacing-in-use.html",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/guidelines/spacing-scale.html",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/guidelines/type-body.html",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/containers/containers.card.html",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/feedback/feedback.card.html",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/forms/forms.card.html",
+   "/Users/gary/dev/RosterHouse/RosterHouse Design System/components/scheduling/scheduling.card.html"
+  ],
+  "missed_gaps": [
+   {
+    "title": "Employees work multiple positions in the seed data but no qualification/eligibility model exists",
+    "severity": "major",
+    "detail": "The data model gives EmployeeProfile a single required positionId ('primary role shown everywhere'), but the manager kit's own demo data contradicts it: Sam Torres (Server in TEAM) is assigned a Dishwasher shift (ManagerApp.jsx line 61, 'Dishwasher|Wed 8'), and Alex Kim (Host in TEAM) works a Dishwasher shift (line 65) and claims a Dishwasher open shift (SwapApprovals.jsx line 7). Swap copy says 'Open to anyone qualified' and readme promises conflict warnings \u2014 both require a many-to-many Employee\u2194Position qualification model (e.g. EmployeePosition join table) plus eligibility filtering in AssignShiftDialog and open-shift claiming. No agent modeled cross-position work or flagged that the single-position schema cannot represent the export's own evidence."
+   },
+   {
+    "title": "'Coverage gaps' metric has no definition and no data model behind it",
+    "severity": "major",
+    "detail": "The dashboard stat 'Coverage gaps this week: 2' (DashboardScreen.jsx line 28) and the dashboard endpoint the data modeler proposed both assume 'coverage gap' is computable, but nothing defines it. Computing coverage gaps requires per-position/per-day-part staffing targets (e.g. '4 Servers on Friday dinner'), and no entity, screen, or settings surface anywhere lets a manager set required staffing levels. Either a StaffingRequirement entity + management UI must be designed, or the product must explicitly redefine the stat as 'count of open (unassigned) shifts' \u2014 a decision nobody surfaced. The gap analyst caught the analogous problem for wage/labor-cost but missed this one."
+   },
+   {
+    "title": "Web push on iOS requires an installed PWA + service worker \u2014 no PWA plan exists",
+    "severity": "major",
+    "detail": "The employee app is a mobile web app whose core loop depends on push notifications ('notified by push and text', 'You'll get a push notification once it's approved or denied', push toggle in Profile). On iOS Safari, Web Push only works for PWAs added to the home screen (manifest + service worker + user install), and there is no PWA manifest, service-worker strategy, install-prompt UX, or notification-permission priming anywhere in the export or in any agent's findings. The gap analyst flagged missing 'push registration' UX and the data modeler added a PushDevice entity, but nobody flagged the platform constraint that makes push undeliverable to iPhone users without PWA installation \u2014 which for an hourly-workforce audience likely makes SMS the primary channel and materially affects the Next.js architecture (service worker, offline caching) and the notification pipeline design."
+   },
+   {
+    "title": "Location has no coordinates or geofence radius despite promised on-site clock-in verification",
+    "severity": "minor",
+    "detail": "TimeClockScreen copy promises 'Uses your phone's location to confirm you're on-site' (EmployeeApp.jsx line 407), and the data modeler's /api/time-clock/clock-in endpoint says 'server verifies geolocation against Location' \u2014 but the proposed Location entity has only name/address/timezone, no lat/lng and no geofence radius, so there is nothing to verify against. Needs Location.latitude/longitude/geofenceRadiusM (plus a settings surface to set them, and a defined out-of-range policy: block vs warn vs record-and-flag). No agent caught this schema hole."
+   },
+   {
+    "title": "Manager has no way to author the shift notes the employee app displays",
+    "severity": "minor",
+    "detail": "Employee Shift Detail renders 'Note from your manager' (EmployeeApp.jsx lines 141-148) and the Shift entity carries notes ('Bring your own knife kit.'), but AssignShiftDialog.jsx \u2014 the only shift create/edit surface \u2014 has no notes field at all (only employee select + start/end time). The components agent noted a Textarea primitive 'will be needed on the manager side too' but no agent flagged the missing notes input in the assign dialog itself, so as designed the field the employee app depends on can never be populated."
+   },
+   {
+    "title": "Overtime conflict type has no supporting configuration or data anywhere",
+    "severity": "minor",
+    "detail": "readme.md and ConflictChip's documented semantics list three conflict kinds: double-booked, outside availability, and overtime. Double-booking and availability have data sources in the model, but overtime detection requires a weekly-hours threshold (e.g. 40 hrs) and rules (per location? per employee? daily OT?), and no field, entity, settings screen, or gap entry from any of the six agents covers it. Before conflict detection can honor the readme's promise, an OT threshold must be added to Location (or org settings) with a management surface \u2014 or overtime must be explicitly cut from v1 conflict detection."
+   },
+   {
+    "title": "Cross-kit mock data is mutually inconsistent and unusable as seed data",
+    "severity": "minor",
+    "detail": "Nobody cross-checked the two kits' demo data: the manager grid week is Mon Jul 6 \u2013 Sun Jul 12, 2026 (Jul 12 IS a Sunday), but the employee kit and SwapApprovals both say 'Sat Jul 12' and 'Sun Jul 13' (EmployeeApp.jsx lines 12-13, SwapApprovals.jsx lines 6-7) \u2014 a day-of-week error inconsistent with the schedule grid. Priya Shah's swap request describes a 'Sat Jul 12, 4\u201310 PM' Server shift, but her only Saturday shift in INITIAL_SHIFTS is 11:00 AM\u20134:00 PM on Sat 11. And the unexamined uploads/pasted-1783291965045-0.png (the only user-provided visual reference, a toast mockup) reads 'Schedule published / 12 employees notified' \u2014 a THIRD notified count alongside the confirm dialog's 5 and the toast's 10. Consequence for the port: the mock arrays cannot be translated into a coherent Prisma seed without reconciliation; a consistent seed dataset must be authored fresh."
+   }
+  ],
+  "corrections": [
+   "managerKit overstates a Sidebar data need: it lists 'Aggregate conflict count for schedule badge' as data the sidebar needs, but Sidebar.jsx renders nav items as icon+label only \u2014 there is no badge or count anywhere in the sidebar. The conflict count appears only in the Schedule header ConflictChip (ManagerApp.jsx line 167, fed by the computed conflictCount at line 102) and as hardcoded text on the dashboard card.",
+   "dataModel misattributes evidence for Notification.tone: it claims tone is 'UI Badge tone on Notifications screen', but NotificationsScreen (EmployeeApp.jsx lines 354-371) renders only title, body, and relative time \u2014 no Badge and no use of tone at all. The employeeKit agent's version ('tone field is never rendered') is the correct one; the field is mock-data-only and its inclusion in the schema should be treated as speculative, not screen-evidenced.",
+   "infra's icon inventory and porting plan ('the needed set is ~18 icons') is incomplete: it was sourced from the guidelines/iconography.html specimen list plus literal grep, which misses the dynamic data-lucide={...} usages. Actually-used icons absent from their list: 'layout-dashboard' (manager Sidebar Dashboard nav, Sidebar.jsx line 3), 'calendar-check' (manager Availability nav AND employee Availability tab, Sidebar.jsx line 6 / EmployeeApp.jsx line 449), and 'timer' (employee Clock tab, EmployeeApp.jsx line 450). Conversely 'settings', 'home', 'plus', 'check', 'x', 'alert-triangle', 'phone', and 'search' appear only in the specimen card, not in any app screen.",
+   "employeeKit's minor gap 'edits are lost when switching Simple/Advanced tabs' is wrong: the avail/hours state lives in AvailabilityScreen (lines 162-166), which stays mounted across the Simple/Advanced Tabs toggle \u2014 switching modes preserves all edits. State is only lost when navigating away via the bottom tab bar (which unmounts AvailabilityScreen), which the same entry does also state correctly. Only the second half of the claim should survive synthesis.",
+   "dataModel's clock-in endpoint description ('server verifies geolocation against Location') is internally inconsistent with its own Location entity, which has no latitude/longitude/geofence-radius fields \u2014 verification as described is impossible against the proposed schema (filed as a missed gap with the fix).",
+   "dataModel's EmployeeProfile.positionId as a single required FK contradicts the export's seed evidence of employees working multiple positions (Sam Torres: Server + Dishwasher shifts; Alex Kim: Host shifts + Dishwasher shift and Dishwasher open-shift claim) \u2014 the 'primary role' framing undersells that a qualification join model is required for eligibility filtering, 'anyone qualified' swaps, and conflict detection (filed as a missed gap).",
+   "Verified accurate under spot-check (no correction needed, synthesis can rely on these): dead time-off Approve/Deny (ManagerApp.jsx 219-220), dead 'Add shift' (line 171), publish 5-vs-10 copy mismatch (lines 256 vs 150), DashboardScreen ignoring its conflictCount prop in favor of hardcoded '2 shifts have conflicts' (lines 15, 37), ANCHOR = new Date(2026, 6, 6) with Today\u2192offset 0 (ScheduleView.jsx 6, 180), SwapApprovals' shared decide() for both Approve and Deny (lines 13-15, 42-43), AvailabilityOverview showing 5 of 10 employees as weekday booleans, dead employee 'Request swap' buttons (EmployeeApp.jsx 149, 346), local-only Claim (line 329), 'Send request' that only closes the dialog (line 253), hardcoded 'Confirmed' badges (lines 108, 126), Button dropping style/hardcoding #fff (Button.jsx 48-50), Toast's checkmark glyph for all tones (Toast.jsx 42-44, only the color varies), Select's unicode \u25be caret (Select.jsx 47), --shadow-focus defined in tokens but unused by Button, no index.js barrel anywhere, and zero dark-mode/prefers-color-scheme hits."
+  ],
+  "summary": "Coverage was strong on all load-bearing JSX, tokens, and infra files; 32 files went unread \u2014 15 of 16 component .prompt.md files (usage intent, e.g. ShiftBlock status\u2192color semantics), 12 of 14 guidelines specimen cards (mostly token-redundant, though effects-motion.html demonstrates the CSS :hover/:active pattern the porting plan recommends and colors-semantic.html maps statuses to product meanings), 4 *.card.html preview shells, and \u2014 most notably \u2014 uploads/pasted-1783291965045-0.png, the only user-provided visual reference, a toast mockup reading '12 employees notified' (a third inconsistent count vs the dialog's 5 and toast's 10). Spot-checks confirmed essentially all headline claims (dead buttons, hardcoded stats, ANCHOR date, shared decide(), 5-vs-10 copy bug); corrections are mostly evidence-attribution errors: a fabricated sidebar conflict badge, dataModel citing a Badge tone the Notifications screen never renders, an icon inventory missing layout-dashboard/calendar-check/timer, and a false claim that Simple/Advanced tab switching loses availability edits. The biggest misses across all six agents: the demo data proves employees work multiple positions while the data model allows one (no qualification model, breaking 'anyone qualified' swaps and eligibility filtering); 'coverage gaps' is uncomputable without an undesigned staffing-requirements concept; iOS web push requires an installed PWA + service worker that no one planned for; Location lacks the coordinates/geofence radius its own clock-in verification requires; the manager UI has no input for the shift notes employees see; overtime conflicts have no threshold config anywhere; and the cross-kit mock data is internally contradictory (wrong day-of-week for Jul 12-13, Priya's swap referencing a nonexistent shift), so a Prisma seed must be authored fresh rather than translated."
+ }
+}
