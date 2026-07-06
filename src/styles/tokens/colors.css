@@ -1,0 +1,94 @@
+/* RosterHouse — Color tokens
+   Base scales + semantic aliases. Palette: deep forest green (primary),
+   harvest amber (accent), warm paper neutrals. */
+
+:root {
+  /* ---- Green (brand primary) ---- */
+  --green-900: #0A1F1A;
+  --green-800: #12312B; /* RosterHouse Green — brand primary */
+  --green-700: #1B4638;
+  --green-600: #245A48;
+  --green-500: #2E7058;
+  --green-400: #4C8B72;
+  --green-300: #7FAE97;
+  --green-200: #B3D2C0;
+  --green-100: #DCEBE3;
+  --green-50:  #F1F7F4;
+
+  /* ---- Amber (accent) ---- */
+  --amber-900: #7A4E12;
+  --amber-800: #9C6518;
+  --amber-700: #C07E1F;
+  --amber-600: #DE9A2C;
+  --amber-500: #F2A93B; /* Harvest Amber — brand accent */
+  --amber-400: #F5BC63;
+  --amber-300: #F8CE8C;
+  --amber-200: #FBE1B6;
+  --amber-100: #FDF0DA;
+  --amber-50:  #FEF8EE;
+
+  /* ---- Neutral (warm paper) ---- */
+  --neutral-900: #2A241C; /* ink */
+  --neutral-800: #3F382C;
+  --neutral-700: #574F40;
+  --neutral-600: #746A57;
+  --neutral-500: #948A73;
+  --neutral-400: #B3A990;
+  --neutral-300: #D0C6AF;
+  --neutral-200: #E3DBC9;
+  --neutral-100: #EDE6DA; /* Warm Paper — brand cream */
+  --neutral-50:  #F7F3EA;
+  --neutral-0:   #FFFFFF;
+
+  /* ---- Semantic: red / danger ---- */
+  --red-700: #8F2E1D;
+  --red-600: #B03823;
+  --red-500: #C0432B;
+  --red-100: #F7DCD3;
+  --red-50:  #FCEEE9;
+
+  /* ---- Semantic: info (muted slate blue, kept out of hero UI) ---- */
+  --blue-700: #234C6B;
+  --blue-600: #2F6FA6;
+  --blue-500: #3E82BC;
+  --blue-100: #DCEAF4;
+  --blue-50:  #EFF6FB;
+
+  /* ---- Semantic aliases ---- */
+  --surface-page:    var(--neutral-50);
+  --surface-card:    var(--neutral-0);
+  --surface-sunken:  var(--neutral-100);
+  --surface-brand:   var(--green-800);
+  --surface-brand-soft: var(--green-50);
+  --surface-inverse: var(--green-900);
+
+  --text-primary:   var(--neutral-900);
+  --text-secondary: var(--neutral-600);
+  --text-tertiary:  var(--neutral-500);
+  --text-inverse:   var(--neutral-50);
+  --text-brand:     var(--green-800);
+  --text-link:      var(--green-700);
+
+  --border-default: var(--neutral-200);
+  --border-strong:  var(--neutral-300);
+  --border-brand:   var(--green-600);
+  --border-focus:   var(--green-600);
+
+  --accent-primary: var(--green-800);
+  --accent-hover:   var(--green-700);
+  --accent-active:  var(--green-900);
+  --accent-contrast: var(--neutral-50);
+
+  --accent-secondary: var(--amber-500);
+  --accent-secondary-hover: var(--amber-600);
+  --accent-secondary-active: var(--amber-700);
+
+  --status-success: var(--green-600);
+  --status-success-bg: var(--green-50);
+  --status-warning: var(--amber-600);
+  --status-warning-bg: var(--amber-50);
+  --status-danger: var(--red-600);
+  --status-danger-bg: var(--red-50);
+  --status-info: var(--blue-600);
+  --status-info-bg: var(--blue-50);
+}

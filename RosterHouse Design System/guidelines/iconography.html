@@ -1,0 +1,20 @@
+<!-- @dsCard group="Brand" viewport="700x170" name="Iconography — Lucide" subtitle="CDN line icons, 1.5-2px stroke, substituted (no source icon set)" -->
+<link rel="stylesheet" href="../styles.css">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<style>
+  body{margin:0;font-family:var(--font-sans);background:var(--surface-card);padding:16px;box-sizing:border-box}
+  .row{display:flex;gap:20px;flex-wrap:wrap}
+  .item{display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--green-700)}
+  .lab{font-size:10px;color:var(--text-secondary);font-weight:600}
+</style>
+<div class="row" id="icons"></div>
+<script>
+  const names = ["calendar","clock","bell","user","users","settings","home","plus","check","x","chevron-right","alert-triangle","repeat","map-pin","phone","search"];
+  const wrap = document.getElementById('icons');
+  names.forEach(n=>{
+    const d = document.createElement('div'); d.className='item';
+    d.innerHTML = '<i data-lucide="'+n+'" style="width:26px;height:26px"></i><span class="lab">'+n+'</span>';
+    wrap.appendChild(d);
+  });
+  lucide.createIcons();
+</script>

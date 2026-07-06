@@ -1,0 +1,16 @@
+<!-- @dsCard group="Brand" viewport="700x150" name="Corner radii" subtitle="Rounded, friendly-not-bubbly" -->
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body{margin:0;font-family:var(--font-sans);background:var(--surface-card);padding:16px;box-sizing:border-box}
+  .row{display:flex;gap:16px;align-items:center}
+  .item{display:flex;flex-direction:column;align-items:center;gap:6px}
+  .box{width:70px;height:70px;background:var(--green-100);border:1.5px solid var(--green-600)}
+  .lab{font-size:11px;font-weight:600;color:var(--text-secondary)}
+</style>
+<div class="row">
+  <div class="item"><div class="box" style="border-radius:var(--radius-sm)"></div><div class="lab">sm 6px</div></div>
+  <div class="item"><div class="box" style="border-radius:var(--radius-md)"></div><div class="lab">md 10px</div></div>
+  <div class="item"><div class="box" style="border-radius:var(--radius-lg)"></div><div class="lab">lg 16px</div></div>
+  <div class="item"><div class="box" style="border-radius:var(--radius-xl)"></div><div class="lab">xl 22px</div></div>
+  <div class="item"><div class="box" style="border-radius:var(--radius-pill)"></div><div class="lab">pill</div></div>
+</div>

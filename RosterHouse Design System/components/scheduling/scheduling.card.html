@@ -1,0 +1,37 @@
+<!-- @dsCard group="Components" viewport="700x420" name="Scheduling primitives" subtitle="ShiftBlock, WeekGridCell, AvatarStatus, ConflictChip" -->
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>body{margin:0;font-family:var(--font-sans);background:var(--surface-page);padding:16px;box-sizing:border-box}</style>
+<div id="root"></div>
+<script type="text/babel">
+const { ShiftBlock, WeekGridCell, AvatarStatus, ConflictChip } = window.RosterHouseDesignSystem_17c92d;
+function Demo(){
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:16}}>
+      <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+        <ShiftBlock role="Line cook" time="7:00 AM – 3:00 PM" employeeName="Maria G." status="confirmed" />
+        <ShiftBlock role="Server" time="4:00 PM – 10:00 PM" status="open" />
+        <ShiftBlock role="Dishwasher" time="6:00 PM – 12:00 AM" employeeName="Sam T." status="conflict" conflictReason="Overlaps Sam's 2–6 PM Server shift" />
+        <ShiftBlock role="Host" time="11:00 AM – 3:00 PM" employeeName="Jordan P." status="draft" />
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8,maxWidth:520}}>
+        <WeekGridCell empty onClick={()=>{}} />
+        <WeekGridCell><ShiftBlock compact role="Server" time="4–10 PM" status="confirmed" /></WeekGridCell>
+        <WeekGridCell hasConflict><ShiftBlock compact role="Cook" time="2–6 PM" status="conflict" /></WeekGridCell>
+        <WeekGridCell empty />
+      </div>
+      <div style={{display:'flex',gap:16,alignItems:'center'}}>
+        <AvatarStatus name="Maria Garcia" status="available" />
+        <AvatarStatus name="Sam Torres" status="unavailable" />
+        <AvatarStatus name="Jordan Park" status="pending" />
+        <AvatarStatus name="Alex Kim" status="off" />
+      </div>
+      <ConflictChip>Overlaps Maria's 2–6 PM shift</ConflictChip>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<Demo/>);
+</script>

@@ -1,0 +1,17 @@
+<!-- @dsCard group="Colors" viewport="700x160" name="Surface & text aliases" subtitle="Semantic tokens components should reference" -->
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body{margin:0;font-family:var(--font-sans);background:var(--surface-page);padding:16px;box-sizing:border-box}
+  .row{display:flex;gap:12px}
+  .c{flex:1;border-radius:var(--radius-lg);padding:16px;box-sizing:border-box;font-size:12px;font-weight:600}
+  .card{background:var(--surface-card);border:1px solid var(--border-default);color:var(--text-primary)}
+  .sunken{background:var(--surface-sunken);color:var(--text-primary)}
+  .brand{background:var(--surface-brand);color:var(--text-inverse)}
+  .brandsoft{background:var(--surface-brand-soft);color:var(--text-brand)}
+</style>
+<div class="row">
+  <div class="c card">surface-card<br><span style="font-weight:400;color:var(--text-secondary)">text-primary / text-secondary</span></div>
+  <div class="c sunken">surface-sunken</div>
+  <div class="c brand">surface-brand<br><span style="font-weight:400;opacity:.85">text-inverse</span></div>
+  <div class="c brandsoft">surface-brand-soft<br><span style="font-weight:400">text-brand</span></div>
+</div>
