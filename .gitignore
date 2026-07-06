@@ -45,3 +45,4 @@ RosterHouse Design System.zip
 next-env.d.ts
 
 /src/generated/prisma
+.gstack/
