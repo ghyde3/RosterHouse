@@ -90,4 +90,24 @@ describe("POST /api/auth/signup", () => {
     const body = await res.json();
     expect(body.error.code).toBe("invalid_phone");
   });
+
+  it("dedupes positions case-insensitively, preserving first occurrence casing", async () => {
+    const email = uniqueEmail();
+    const res = await POST(
+      signupRequest({
+        email,
+        positions: ["Server", "server", "DISHWASHER", "dishwasher", "Host"],
+      }),
+    );
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    createdOrgIds.push(body.data.organizationId);
+
+    const positions = await prisma.position.findMany({
+      where: { locationId: body.data.locationId },
+      orderBy: { sortOrder: "asc" },
+    });
+    expect(positions.map((p) => p.name)).toEqual(["Server", "DISHWASHER", "Host"]);
+  });
 });

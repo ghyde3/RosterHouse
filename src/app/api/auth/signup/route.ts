@@ -48,7 +48,18 @@ export async function POST(req: Request) {
       return jsonErr("account_exists", DUPLICATE_ACCOUNT_MESSAGE, 409);
     }
 
-    const positionNames = [...new Set(input.positions.map((p) => p.trim()).filter(Boolean))];
+    // Deduplicate positions case-insensitively; preserve original casing from first occurrence
+    const positionNamesRaw = input.positions.map((p) => p.trim()).filter(Boolean);
+    const seenLower = new Set<string>();
+    const positionNames: string[] = [];
+    for (const name of positionNamesRaw) {
+      const lower = name.toLowerCase();
+      if (!seenLower.has(lower)) {
+        seenLower.add(lower);
+        positionNames.push(name);
+      }
+    }
+
     const passwordHash = await hashPassword(input.password); // slow — keep it outside the transaction
 
     // Org + location + positions + manager user are created atomically: a
@@ -81,8 +92,24 @@ export async function POST(req: Request) {
     // cases, but a concurrent signup with the same email/phone can still
     // race past it and hit the unique constraint inside the transaction.
     // Map that to the same calm 409 instead of leaking a raw Prisma error.
+    // BUT: position dedupe is now case-insensitive, so P2002 on Position
+    // collisions should not happen in practice — this is just safety.
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
-      return jsonErr("account_exists", DUPLICATE_ACCOUNT_MESSAGE, 409);
+      const target = err.meta?.target as string[] | undefined;
+      const isAccountViolation =
+        target && (target.includes("email") || target.includes("phone"));
+      if (isAccountViolation) {
+        return jsonErr("account_exists", DUPLICATE_ACCOUNT_MESSAGE, 409);
+      }
+      // Position or other constraint; return a scoped message
+      if (target && (target.includes("locationId") || target.includes("name"))) {
+        return jsonErr(
+          "duplicate_position",
+          "Two of your positions have the same name. Give each position a different name.",
+          409,
+        );
+      }
+      // Anything else: fall through to generic error handling
     }
     return handleApiError(err);
   }
