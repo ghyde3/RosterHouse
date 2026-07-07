@@ -32,6 +32,7 @@ const ACTION_LABELS: Record<string, string> = {
   "drop.denied": "denied a drop request",
   "template.applied": "applied a schedule template",
   "location.settings_updated": "updated location settings",
+  "location.created": "created a location",
 };
 
 function actionLabel(action: string): string {
