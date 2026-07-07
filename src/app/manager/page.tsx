@@ -71,6 +71,7 @@ async function DashboardContent({
         />
         <StatCard label="Pending requests" value={String(data.pendingRequests)} />
         <StatCard label="Projected labor cost" value={data.projectedLaborCost} />
+        <StatCard label="Actual labor cost" value={data.actualLaborCost} />
         <StatCard
           label="Clocked in now"
           value={String(data.clockedInNow.length)}

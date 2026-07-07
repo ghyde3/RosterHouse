@@ -7,6 +7,7 @@ import {
   weekStartOf,
   type ISODate,
 } from "@/lib/time";
+import { entryHours } from "@/lib/timesheet-data";
 
 export type DashboardData = {
   weekStart: ISODate;
@@ -16,6 +17,7 @@ export type DashboardData = {
   pendingClaims: number;
   pendingRequests: number;
   projectedLaborCost: string;
+  actualLaborCost: string;
   conflictCountThisWeek: number;
   clockedInNow: { name: string; positionName: string | null }[];
 };
@@ -27,7 +29,7 @@ export async function getDashboardData(
   const weekStart = weekStartOf(new Date(), timezone);
   const weekEnd = addDaysISO(weekStart, 6);
 
-  const [shifts, pendingTimeOff, pendingSwaps, pendingClaims, pendingRequests, clockEntries, weekData] =
+  const [shifts, pendingTimeOff, pendingSwaps, pendingClaims, pendingRequests, clockEntries, weekData, weekClockEntries] =
     await Promise.all([
       prisma.shift.findMany({
         where: { locationId, date: { gte: new Date(weekStart), lte: new Date(weekEnd) } },
@@ -45,6 +47,16 @@ export async function getDashboardData(
         orderBy: { clockInAt: "asc" },
       }),
       getScheduleWeekData(locationId, weekStart), // reuses conflict annotation
+      prisma.timeClockEntry.findMany({
+        where: {
+          locationId,
+          clockInAt: {
+            gte: new Date(`${weekStart}T00:00:00.000Z`),
+            lt: new Date(`${addDaysISO(weekStart, 7)}T00:00:00.000Z`),
+          },
+        },
+        include: { employeeProfile: true },
+      }),
     ]);
 
   const assigned = shifts.filter((s) => s.employeeProfileId !== null);
@@ -63,6 +75,20 @@ export async function getDashboardData(
     projectedLaborCost = `$${Math.round(total).toLocaleString("en-US")}`;
   }
 
+  // Actual week-to-date cost: only completed entries; any completed entry
+  // whose employee has no rate makes the figure dishonest → em dash.
+  const completed = weekClockEntries.filter((e) => e.clockOutAt !== null);
+  let actualLaborCost = "—";
+  if (completed.length === 0) {
+    actualLaborCost = "$0";
+  } else if (completed.every((e) => e.employeeProfile.hourlyRate != null)) {
+    const total = completed.reduce(
+      (sum, e) => sum + entryHours(e.clockInAt, e.clockOutAt) * Number(e.employeeProfile.hourlyRate),
+      0,
+    );
+    actualLaborCost = `$${Math.round(total).toLocaleString("en-US")}`;
+  }
+
   return {
     weekStart,
     openShiftsThisWeek: shifts.filter((s) => s.employeeProfileId === null).length,
@@ -71,6 +97,7 @@ export async function getDashboardData(
     pendingClaims,
     pendingRequests,
     projectedLaborCost,
+    actualLaborCost,
     conflictCountThisWeek: weekData.conflictCount,
     clockedInNow: clockEntries.map((e) => ({
       name: e.employeeProfile.user.name,
