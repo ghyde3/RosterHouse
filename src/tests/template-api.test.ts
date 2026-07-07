@@ -7,7 +7,7 @@ const mockSession = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/auth", () => ({ auth: vi.fn(async () => mockSession.current) }));
 
-import { GET as listTemplatesRoute, POST as createTemplateRoute } from "@/app/api/schedule-templates/route";
+import { POST as createTemplateRoute } from "@/app/api/schedule-templates/route";
 import {
   DELETE as deleteTemplateRoute,
   GET as getTemplateRoute,

@@ -1,6 +1,5 @@
 import "dotenv/config";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { ApiError } from "@/lib/api";
 import {
   applyTemplate,
   createTemplate,

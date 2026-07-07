@@ -187,7 +187,7 @@ export function TemplatesView({ currentWeek, employees, templates }: TemplatesVi
           </>
         }
       >
-        <p>"{deleteTarget?.name}" will be removed. Shifts you already created from it stay put.</p>
+        <p>&quot;{deleteTarget?.name}&quot; will be removed. Shifts you already created from it stay put.</p>
       </Dialog>
 
       <ApplyTemplateDialog open={applyOpen} week={currentWeek} employees={employees} onClose={() => setApplyOpen(false)} />

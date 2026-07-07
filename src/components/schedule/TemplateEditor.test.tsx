@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { detailRowsToEditor, editorRowsToInput, type EditorRow } from "@/components/schedule/TemplateEditor";
+import { detailRowsToEditor, editorRowsToInput } from "@/components/schedule/TemplateEditor";
 import type { TemplateRow } from "@/lib/template-data";
 
 describe("editor row conversions", () => {
