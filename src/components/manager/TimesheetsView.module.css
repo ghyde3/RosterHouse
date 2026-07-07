@@ -153,6 +153,15 @@
   gap: 12px;
 }
 
+.timeRow {
+  display: flex;
+  gap: 10px;
+}
+
+.timeRow > * {
+  flex: 1;
+}
+
 .dialogActions {
   display: flex;
   justify-content: flex-end;

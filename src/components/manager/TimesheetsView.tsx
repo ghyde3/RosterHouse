@@ -10,7 +10,14 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Icon } from "@/components/ui/Icon";
 import { Input } from "@/components/ui/Input";
 import { DatePager } from "@/components/chrome/DatePager";
+import { TimeField } from "@/components/ui/TimeField";
 import { useToast } from "@/components/ui/Toaster";
+import {
+  formatTime,
+  localISODate,
+  localToUtc,
+  parseTime12h,
+} from "@/lib/time";
 import type {
   TimesheetEmployee,
   TimesheetEntry,
@@ -20,6 +27,7 @@ import styles from "./TimesheetsView.module.css";
 
 export type TimesheetsViewProps = {
   locationId: string;
+  timezone: string;
   weekStart: string;
   weekLabel: string;
   prevHref: string;
@@ -33,23 +41,27 @@ export function formatCost(cost: number | null): string {
   return `$${Math.round(cost).toLocaleString("en-US")}`;
 }
 
-/** ISO instant → local "1:00 PM" (browser timezone; wall-clock detail is in shiftLabel). */
-function clockLabel(iso: string): string {
-  return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+/** ISO instant → location-local "1:00 PM" (NOT the browser's timezone). */
+function clockLabel(iso: string, timezone: string): string {
+  return formatTime(new Date(iso), timezone);
 }
 
-/** "2026-07-06T13:00:00.000Z" → "2026-07-06T13:00" for a datetime-local input. */
-function toLocalInput(iso: string): string {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+/** ISO instant → { date: "2026-07-06", time: "9:00 AM" } in `timezone`. */
+function toLocalFields(iso: string, timezone: string): { date: string; time: string } {
+  const instant = new Date(iso);
+  return {
+    date: localISODate(instant, timezone),
+    time: formatTime(instant, timezone),
+  };
 }
 
-/** A "2026-07-06T13:00" datetime-local value → ISO instant, or null if empty/invalid. */
-function fromLocalInput(value: string): string | null {
-  if (!value.trim()) return null;
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+/** A local date + 12h time string → ISO instant in `timezone`, or null if invalid/incomplete. */
+function fromLocalFields(date: string, time: string, timezone: string): string | null {
+  if (!date.trim() || !time.trim()) return null;
+  const parsed = parseTime12h(time);
+  if (!parsed) return null;
+  const instant = localToUtc(date, parsed, timezone);
+  return Number.isNaN(instant.getTime()) ? null : instant.toISOString();
 }
 
 type EditState =
@@ -59,6 +71,7 @@ type EditState =
 
 export function TimesheetsView({
   locationId,
+  timezone,
   weekStart,
   weekLabel,
   prevHref,
@@ -71,8 +84,10 @@ export function TimesheetsView({
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [edit, setEdit] = useState<EditState>(null);
   const [confirmDelete, setConfirmDelete] = useState<TimesheetEntry | null>(null);
-  const [clockIn, setClockIn] = useState("");
-  const [clockOut, setClockOut] = useState("");
+  const [clockInDate, setClockInDate] = useState("");
+  const [clockInTime, setClockInTime] = useState("");
+  const [clockOutDate, setClockOutDate] = useState("");
+  const [clockOutTime, setClockOutTime] = useState("");
   const [busy, setBusy] = useState(false);
 
   const exportHref = `/api/locations/${locationId}/timesheets/export?weekStart=${weekStart}`;
@@ -87,24 +102,35 @@ export function TimesheetsView({
   }
 
   function openAdd(employeeProfileId: string) {
-    setClockIn("");
-    setClockOut("");
+    setClockInDate(weekStart);
+    setClockInTime("");
+    setClockOutDate("");
+    setClockOutTime("");
     setEdit({ mode: "add", employeeProfileId });
   }
   function openEdit(employeeProfileId: string, entry: TimesheetEntry) {
-    setClockIn(toLocalInput(entry.clockInAt));
-    setClockOut(entry.clockOutAt ? toLocalInput(entry.clockOutAt) : "");
+    const inFields = toLocalFields(entry.clockInAt, timezone);
+    setClockInDate(inFields.date);
+    setClockInTime(inFields.time);
+    if (entry.clockOutAt) {
+      const outFields = toLocalFields(entry.clockOutAt, timezone);
+      setClockOutDate(outFields.date);
+      setClockOutTime(outFields.time);
+    } else {
+      setClockOutDate("");
+      setClockOutTime("");
+    }
     setEdit({ mode: "edit", employeeProfileId, entry });
   }
 
   async function saveEdit() {
     if (!edit) return;
-    const clockInAt = fromLocalInput(clockIn);
+    const clockInAt = fromLocalFields(clockInDate, clockInTime, timezone);
     if (!clockInAt) {
-      toast({ tone: "danger", title: "Enter a clock-in time" });
+      toast({ tone: "danger", title: "Enter a clock-in date and time" });
       return;
     }
-    const clockOutAt = fromLocalInput(clockOut);
+    const clockOutAt = fromLocalFields(clockOutDate, clockOutTime, timezone);
     setBusy(true);
     try {
       const url =
@@ -231,8 +257,8 @@ export function TimesheetsView({
                       <div key={entry.id} className={styles.punchRow}>
                         <span className={styles.punchTimes}>{entry.date}</span>
                         <span className={styles.punchMeta}>
-                          {clockLabel(entry.clockInAt)} –{" "}
-                          {entry.clockOutAt ? clockLabel(entry.clockOutAt) : "—"}
+                          {clockLabel(entry.clockInAt, timezone)} –{" "}
+                          {entry.clockOutAt ? clockLabel(entry.clockOutAt, timezone) : "—"}
                           {entry.shiftLabel && <span>· shift {entry.shiftLabel}</span>}
                           {entry.incomplete && <Badge tone="warning">Open</Badge>}
                           {entry.late && <Badge tone="danger">Late</Badge>}
@@ -281,18 +307,34 @@ export function TimesheetsView({
         title={edit?.mode === "add" ? "Add punch" : "Edit punch"}
       >
         <div className={styles.dialogFields}>
-          <Input
-            label="Clock in"
-            type="datetime-local"
-            value={clockIn}
-            onChange={(e) => setClockIn(e.target.value)}
-          />
-          <Input
-            label="Clock out (leave blank if still open)"
-            type="datetime-local"
-            value={clockOut}
-            onChange={(e) => setClockOut(e.target.value)}
-          />
+          <div className={styles.timeRow}>
+            <Input
+              label="Clock-in date"
+              type="date"
+              value={clockInDate}
+              onChange={(e) => setClockInDate(e.target.value)}
+            />
+            <TimeField
+              label="Clock-in time"
+              placeholder="9:00 AM"
+              value={clockInTime}
+              onChange={setClockInTime}
+            />
+          </div>
+          <div className={styles.timeRow}>
+            <Input
+              label="Clock-out date"
+              type="date"
+              value={clockOutDate}
+              onChange={(e) => setClockOutDate(e.target.value)}
+            />
+            <TimeField
+              label="Clock-out time"
+              placeholder="Leave blank if still open"
+              value={clockOutTime}
+              onChange={setClockOutTime}
+            />
+          </div>
           <div className={styles.dialogActions}>
             <Button variant="ghost" onClick={() => setEdit(null)} disabled={busy}>
               Cancel

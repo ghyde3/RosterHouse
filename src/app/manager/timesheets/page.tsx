@@ -29,6 +29,7 @@ export default async function TimesheetsPage({
   return (
     <TimesheetsView
       locationId={location.id}
+      timezone={location.timezone}
       weekStart={weekStart}
       weekLabel={formatWeekOf(weekStart)}
       prevHref={`/manager/timesheets?week=${addDaysISO(weekStart, -7)}`}

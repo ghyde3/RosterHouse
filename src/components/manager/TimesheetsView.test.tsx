@@ -67,6 +67,7 @@ const data: TimesheetWeekData = {
 
 const baseProps = {
   locationId: "loc1",
+  timezone: "America/New_York",
   weekStart: "2026-07-06",
   weekLabel: "Week of Jul 6",
   prevHref: "/manager/timesheets?week=2026-06-29",
@@ -126,5 +127,39 @@ describe("TimesheetsView", () => {
     expect(link.getAttribute("href")).toBe(
       "/api/locations/loc1/timesheets/export?weekStart=2026-07-06",
     );
+  });
+
+  it("renders punch times in the location timezone, not the test runner's TZ", () => {
+    // Ana's entry clockInAt is 2026-07-06T13:00:00.000Z, which is 9:00 AM in
+    // America/New_York year-round-safe for this fixed date (EDT, UTC-4).
+    render(<TimesheetsView {...baseProps} />);
+    fireEvent.click(screen.getByText("Ana Diaz")); // expand to reveal punch rows
+    expect(screen.getByText(/^9:00 AM – 5:00 PM/)).toBeTruthy();
+  });
+
+  it("prefills the edit dialog with the location-local date and time", () => {
+    render(<TimesheetsView {...baseProps} />);
+    fireEvent.click(screen.getByText("Ana Diaz")); // expand
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    // Clock-in 2026-07-06T13:00:00.000Z → 2026-07-06 9:00 AM in America/New_York.
+    expect((screen.getByLabelText("Clock-in date") as HTMLInputElement).value).toBe("2026-07-06");
+    expect((screen.getByLabelText("Clock-in time") as HTMLInputElement).value).toBe("9:00 AM");
+    // Clock-out 2026-07-06T21:00:00.000Z → 5:00 PM same local day.
+    expect((screen.getByLabelText("Clock-out date") as HTMLInputElement).value).toBe("2026-07-06");
+    expect((screen.getByLabelText("Clock-out time") as HTMLInputElement).value).toBe("5:00 PM");
+  });
+
+  it("saves an edited punch by converting location-local wall-clock fields to a UTC instant", async () => {
+    render(<TimesheetsView {...baseProps} />);
+    fireEvent.click(screen.getByText("Ana Diaz")); // expand
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.change(screen.getByLabelText("Clock-in time"), { target: { value: "10:00 AM" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("/api/time-clock-entries/e1");
+    const body = JSON.parse((init as RequestInit).body as string);
+    // 10:00 AM America/New_York on 2026-07-06 = 14:00:00.000Z (EDT, UTC-4).
+    expect(body.clockInAt).toBe("2026-07-06T14:00:00.000Z");
   });
 });
