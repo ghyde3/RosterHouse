@@ -1,12 +1,12 @@
-import { Fragment } from "react";
 import { requireManager } from "@/lib/auth";
 import { getManagerLocation } from "@/lib/authz";
-import { getLocationAvailability, type OverviewDay } from "@/lib/queries/availability";
-import { addDaysISO, formatDayLabel, weekDatesOf, weekStartOf } from "@/lib/time";
-import { formatWeekOf, hhmmTo12h } from "@/lib/time-format";
+import { prisma } from "@/lib/db";
+import { getLocationAvailability } from "@/lib/queries/availability";
+import { addDaysISO, weekStartOf } from "@/lib/time";
+import { formatWeekOf } from "@/lib/time-format";
 import { DatePager } from "@/components/chrome/DatePager";
-import { Avatar } from "@/components/ui/Avatar";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { AvailabilityView } from "./AvailabilityView";
 import styles from "./availability.module.css";
 
 const WEEK_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -22,8 +22,13 @@ export default async function ManagerAvailabilityPage({
   const thisWeek = weekStartOf(new Date(), location.timezone);
   const weekStart = week && WEEK_RE.test(week) ? week : thisWeek;
 
-  const data = await getLocationAvailability(location.id, weekStart);
-  const dates = weekDatesOf(weekStart);
+  const [data, positions] = await Promise.all([
+    getLocationAvailability(location.id, weekStart),
+    prisma.position.findMany({
+      where: { locationId: location.id },
+      orderBy: { sortOrder: "asc" },
+    }),
+  ]);
 
   return (
     <div className={styles.page}>
@@ -48,50 +53,12 @@ export default async function ManagerAvailabilityPage({
           description="Invite your team from the Team page to see their availability here."
         />
       ) : (
-        <div className={styles.gridWrap}>
-          <div className={styles.grid}>
-            <div />
-            {dates.map((d) => (
-              <div key={d} className={styles.dayHead}>
-                {formatDayLabel(d)}
-              </div>
-            ))}
-            {data.employees.map((e) => (
-              <Fragment key={e.profileId}>
-                <div className={styles.person}>
-                  <Avatar name={e.name} size={28} />
-                  <div>
-                    <div className={styles.personName}>{e.name}</div>
-                    {e.primaryPositionName && (
-                      <div className={styles.personRole}>{e.primaryPositionName}</div>
-                    )}
-                  </div>
-                </div>
-                {e.days.map((day) => (
-                  <AvailabilityCell key={day.date} day={day} />
-                ))}
-              </Fragment>
-            ))}
-          </div>
-        </div>
+        <AvailabilityView
+          weekStart={weekStart}
+          employees={data.employees}
+          positions={positions.map((p) => ({ id: p.id, name: p.name }))}
+        />
       )}
     </div>
   );
-}
-
-function AvailabilityCell({ day }: { day: OverviewDay }) {
-  if (day.timeOff) {
-    return <div className={`${styles.cell} ${styles.cellTimeOff}`}>Time off</div>;
-  }
-  if (!day.isAvailable) {
-    return <div className={`${styles.cell} ${styles.cellOff}`}>Unavailable</div>;
-  }
-  if (day.startTime && day.endTime) {
-    return (
-      <div className={`${styles.cell} ${styles.cellOn}`}>
-        {hhmmTo12h(day.startTime)} – {hhmmTo12h(day.endTime)}
-      </div>
-    );
-  }
-  return <div className={`${styles.cell} ${styles.cellOn}`}>All day</div>;
 }
