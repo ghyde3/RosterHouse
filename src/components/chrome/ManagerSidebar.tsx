@@ -20,6 +20,7 @@ const NAV: Array<{
   { href: "/manager/availability", label: "Availability", icon: "calendar-check" },
   { href: "/manager/time-off", label: "Time off", icon: "clock" },
   { href: "/manager/swaps", label: "Swaps & open shifts", icon: "repeat" },
+  { href: "/manager/timesheets", label: "Timesheets", icon: "timer" },
 ];
 
 export type ManagerSidebarProps = {
