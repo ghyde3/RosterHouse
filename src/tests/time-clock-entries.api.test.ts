@@ -13,6 +13,7 @@ vi.mock("@/lib/auth", () => ({
 
 import { prisma } from "@/lib/db";
 import { POST } from "@/app/api/time-clock-entries/route";
+import { PATCH, DELETE } from "@/app/api/time-clock-entries/[id]/route";
 import { createFixture, createShiftAt, destroyFixture, type Fixture } from "./helpers/factory";
 import { signInAs } from "./helpers/auth";
 
@@ -91,5 +92,112 @@ describe("POST /api/time-clock-entries", () => {
     signInAs(f.managerUserId, { role: "manager", organizationId: f.orgId });
     const res = await POST(post({ employeeProfileId: f.ana.profileId, clockInAt: "nope" }));
     expect(res.status).toBe(400);
+  });
+});
+
+function ctx(id: string) {
+  return { params: Promise.resolve({ id }) };
+}
+function patch(body: unknown) {
+  return new Request("http://test/api/time-clock-entries/x", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+describe("PATCH /api/time-clock-entries/[id]", () => {
+  let f: Fixture;
+  beforeAll(async () => {
+    f = await createFixture();
+  });
+  afterAll(async () => {
+    await destroyFixture(f);
+  });
+
+  it("edits the clock-out and re-stamps the audit", async () => {
+    const entry = await prisma.timeClockEntry.create({
+      data: {
+        employeeProfileId: f.ana.profileId,
+        locationId: f.locationId,
+        clockInAt: new Date("2026-07-06T13:00:00.000Z"),
+        clockOutAt: null,
+      },
+    });
+    signInAs(f.managerUserId, { role: "manager", organizationId: f.orgId });
+    const res = await PATCH(patch({ clockOutAt: "2026-07-06T21:00:00.000Z" }), ctx(entry.id));
+    const json = await res.json();
+    expect(json.ok).toBe(true);
+    const after = await prisma.timeClockEntry.findUniqueOrThrow({ where: { id: entry.id } });
+    expect(after.clockOutAt?.toISOString()).toBe("2026-07-06T21:00:00.000Z");
+    expect(after.editedByUserId).toBe(f.managerUserId);
+    expect(after.editedAt).not.toBeNull();
+  });
+
+  it("rejects an entry from another location (404)", async () => {
+    const other = await createFixture();
+    const foreign = await prisma.timeClockEntry.create({
+      data: {
+        employeeProfileId: other.ana.profileId,
+        locationId: other.locationId,
+        clockInAt: new Date("2026-07-06T13:00:00.000Z"),
+      },
+    });
+    signInAs(f.managerUserId, { role: "manager", organizationId: f.orgId });
+    const res = await PATCH(patch({ clockOutAt: "2026-07-06T21:00:00.000Z" }), ctx(foreign.id));
+    expect(res.status).toBe(404);
+    await destroyFixture(other);
+  });
+
+  it("rejects invalid input (400)", async () => {
+    const entry = await prisma.timeClockEntry.create({
+      data: {
+        employeeProfileId: f.ana.profileId,
+        locationId: f.locationId,
+        clockInAt: new Date("2026-07-06T13:00:00.000Z"),
+      },
+    });
+    signInAs(f.managerUserId, { role: "manager", organizationId: f.orgId });
+    const res = await PATCH(patch({ clockInAt: "nope" }), ctx(entry.id));
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("DELETE /api/time-clock-entries/[id]", () => {
+  let f: Fixture;
+  beforeAll(async () => {
+    f = await createFixture();
+  });
+  afterAll(async () => {
+    await destroyFixture(f);
+  });
+
+  it("deletes the entry", async () => {
+    const entry = await prisma.timeClockEntry.create({
+      data: {
+        employeeProfileId: f.ana.profileId,
+        locationId: f.locationId,
+        clockInAt: new Date("2026-07-06T13:00:00.000Z"),
+      },
+    });
+    signInAs(f.managerUserId, { role: "manager", organizationId: f.orgId });
+    const res = await DELETE(new Request("http://test/x", { method: "DELETE" }), ctx(entry.id));
+    expect((await res.json()).data.deleted).toBe(true);
+    expect(await prisma.timeClockEntry.findUnique({ where: { id: entry.id } })).toBeNull();
+  });
+
+  it("rejects an entry from another location (404)", async () => {
+    const other = await createFixture();
+    const foreign = await prisma.timeClockEntry.create({
+      data: {
+        employeeProfileId: other.ana.profileId,
+        locationId: other.locationId,
+        clockInAt: new Date("2026-07-06T13:00:00.000Z"),
+      },
+    });
+    signInAs(f.managerUserId, { role: "manager", organizationId: f.orgId });
+    const res = await DELETE(new Request("http://test/x", { method: "DELETE" }), ctx(foreign.id));
+    expect(res.status).toBe(404);
+    await destroyFixture(other);
   });
 });
