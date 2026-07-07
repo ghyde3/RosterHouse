@@ -17,6 +17,11 @@
   color: var(--text-secondary);
 }
 
+.dangerNote {
+  font-size: 13px;
+  color: var(--status-danger);
+}
+
 .subtle {
   font-size: 11px;
   color: var(--text-tertiary);

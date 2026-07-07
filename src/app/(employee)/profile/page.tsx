@@ -5,6 +5,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { NotificationPrefs } from "./NotificationPrefs";
+import { PushDeviceSetup } from "@/components/employee/PushDeviceSetup";
 import { logOut } from "./actions";
 import styles from "@/components/employee/employee.module.css";
 
@@ -37,6 +38,7 @@ export default async function ProfilePage() {
           notifyEmail: ctx.notifyEmail,
         }}
       />
+      <PushDeviceSetup />
 
       <form action={logOut}>
         <Button variant="ghost" fullWidth type="submit">
