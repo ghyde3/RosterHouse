@@ -53,4 +53,10 @@ describe("TemplatesView", () => {
     expect(url).toBe("/api/schedule-templates/t1");
     expect((init as RequestInit).method).toBe("DELETE");
   });
+
+  it("links Edit to the relocated settings/templates path", () => {
+    render(<TemplatesView currentWeek="2026-07-06" employees={[]} templates={templates} />);
+    const editLinks = screen.getAllByRole("link", { name: "Edit" });
+    expect(editLinks[0]).toHaveAttribute("href", "/manager/settings/templates/t1");
+  });
 });

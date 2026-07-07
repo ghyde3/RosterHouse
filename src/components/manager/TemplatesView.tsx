@@ -48,7 +48,7 @@ export function TemplatesView({ currentWeek, employees, templates }: TemplatesVi
       const body = await res.json();
       if (!body.ok) throw new Error(body.error.message);
       setNewOpen(false);
-      router.push(`/manager/templates/${body.data.template.id}`);
+      router.push(`/manager/settings/templates/${body.data.template.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     }
@@ -125,7 +125,7 @@ export function TemplatesView({ currentWeek, employees, templates }: TemplatesVi
                 <div className={styles.subtitle}>{templateSubtitle(t)}</div>
               </div>
               <div className={styles.cardActions}>
-                <Link href={`/manager/templates/${t.id}`} className={styles.editLink}>
+                <Link href={`/manager/settings/templates/${t.id}`} className={styles.editLink}>
                   Edit
                 </Link>
                 <Button
