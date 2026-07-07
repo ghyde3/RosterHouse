@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { DatePager } from "@/components/chrome/DatePager";
+import ApplyTemplateDialog from "@/components/schedule/ApplyTemplateDialog";
 import AssignShiftDialog, {
   type AssignShiftDialogInitial,
 } from "@/components/schedule/AssignShiftDialog";
@@ -65,6 +66,7 @@ export default function ScheduleView({
   const [dialogInitial, setDialogInitial] = useState<AssignShiftDialogInitial | null>(null);
   const [publishOpen, setPublishOpen] = useState(false);
   const [saveOpen, setSaveOpen] = useState(false);
+  const [applyOpen, setApplyOpen] = useState(false);
 
   function buildUrl(next: Partial<{ view: string; week: ISODate; day: ISODate; month: string }>): string {
     const nextView = next.view ?? view;
@@ -167,6 +169,9 @@ export default function ScheduleView({
           <Button variant="secondary" onClick={() => setSaveOpen(true)}>
             Save as template
           </Button>
+          <Button variant="secondary" onClick={() => setApplyOpen(true)}>
+            Apply template
+          </Button>
           <Button variant="secondary" onClick={() => openAdd(null, null)}>
             Add shift
           </Button>
@@ -243,6 +248,13 @@ export default function ScheduleView({
       />
 
       <SaveAsTemplateDialog open={saveOpen} week={week} onClose={() => setSaveOpen(false)} />
+
+      <ApplyTemplateDialog
+        open={applyOpen}
+        week={week}
+        employees={employees}
+        onClose={() => setApplyOpen(false)}
+      />
     </div>
   );
 }
