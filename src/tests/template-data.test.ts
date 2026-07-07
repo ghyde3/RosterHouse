@@ -2,6 +2,7 @@ import "dotenv/config";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ApiError } from "@/lib/api";
 import {
+  applyTemplate,
   createTemplate,
   deleteTemplate,
   getTemplateDetail,
@@ -10,7 +11,7 @@ import {
   updateTemplate,
 } from "@/lib/template-data";
 import { createFixture, createShiftAt, destroyFixture, type Fixture } from "./helpers/factory";
-import { addDaysISO, localToUtc, weekStartOf } from "@/lib/time";
+import { addDaysISO, formatTime, localToUtc, weekStartOf } from "@/lib/time";
 import { snapshotWeekToRows } from "@/lib/template-data";
 import { prisma } from "@/lib/db";
 
@@ -215,6 +216,103 @@ describe("resolveTemplateForWeek", () => {
     const other = await createFixture();
     try {
       expect(await resolveTemplateForWeek(other.locationId, t.id, weekStartOf(new Date(), other.timezone), other.timezone)).toBeNull();
+    } finally {
+      await destroyFixture(other);
+    }
+  });
+});
+
+describe("applyTemplate", () => {
+  it("preserves wall-clock across a DST boundary (EST vs EDT weeks)", async () => {
+    const template = await createTemplate(f.locationId, "DST week", [
+      { positionId: f.positionIds.server, employeeProfileId: null, dayOfWeek: 0, startTime: "9:00 AM", endTime: "5:00 PM" },
+    ]);
+    // 2026-02-02 is a Monday in EST; 2026-07-06 is a Monday in EDT.
+    for (const week of ["2026-02-02", "2026-07-06"]) {
+      const res = (await applyTemplate(f.locationId, template.id, { targetWeek: week, mode: "replace", assignments: {} }, f.timezone))!;
+      expect(res.created).toBe(1);
+      const schedule = await prisma.schedule.findFirstOrThrow({
+        where: { locationId: f.locationId, weekStartDate: new Date(week) },
+      });
+      const shift = await prisma.shift.findFirstOrThrow({ where: { scheduleId: schedule.id, status: "draft" } });
+      expect(formatTime(shift.startsAt, f.timezone)).toBe("9:00 AM");
+      expect(formatTime(shift.endsAt, f.timezone)).toBe("5:00 PM");
+      // cleanup this DST probe week
+      await prisma.shift.deleteMany({ where: { scheduleId: schedule.id } });
+      await prisma.schedule.delete({ where: { id: schedule.id } });
+    }
+  });
+
+  it("replace deletes only draft shifts (published survive); add appends", async () => {
+    const targetWeek = addDaysISO(weekStartOf(new Date(), f.timezone), 14); // isolate: 2 weeks out
+    // Seed the target week with one PUBLISHED and one DRAFT shift.
+    await createShiftAt(f, {
+      positionId: f.positionIds.server, employeeProfileId: null,
+      startsAt: localToUtc(targetWeek, { hour: 6, minute: 0 }, f.timezone),
+      endsAt: localToUtc(targetWeek, { hour: 10, minute: 0 }, f.timezone),
+      status: "published",
+    });
+    await createShiftAt(f, {
+      positionId: f.positionIds.server, employeeProfileId: null,
+      startsAt: localToUtc(targetWeek, { hour: 11, minute: 0 }, f.timezone),
+      endsAt: localToUtc(targetWeek, { hour: 15, minute: 0 }, f.timezone),
+      status: "draft",
+    });
+
+    const template = await createTemplate(f.locationId, "Replace add", [
+      { positionId: f.positionIds.server, employeeProfileId: null, dayOfWeek: 3, startTime: "9:00 AM", endTime: "5:00 PM" },
+    ]);
+    const schedule = await prisma.schedule.findFirstOrThrow({
+      where: { locationId: f.locationId, weekStartDate: new Date(targetWeek) },
+    });
+
+    // ADD: 1 published + 1 draft + 1 new template draft = 3.
+    await applyTemplate(f.locationId, template.id, { targetWeek, mode: "add", assignments: {} }, f.timezone);
+    expect(await prisma.shift.count({ where: { scheduleId: schedule.id } })).toBe(3);
+
+    // REPLACE: drops the 2 drafts (seeded + added), keeps the 1 published, adds 1 template draft = 2.
+    await applyTemplate(f.locationId, template.id, { targetWeek, mode: "replace", assignments: {} }, f.timezone);
+    expect(await prisma.shift.count({ where: { scheduleId: schedule.id } })).toBe(2);
+    expect(await prisma.shift.count({ where: { scheduleId: schedule.id, status: "published" } })).toBe(1);
+  });
+
+  it("honors assignment overrides and coerces off-team ids to open", async () => {
+    const targetWeek = addDaysISO(weekStartOf(new Date(), f.timezone), 21);
+    const template = await createTemplate(f.locationId, "Assign apply", [
+      { positionId: f.positionIds.server, employeeProfileId: f.ana.profileId, dayOfWeek: 0, startTime: "9:00 AM", endTime: "5:00 PM" },
+      { positionId: f.positionIds.server, employeeProfileId: f.ana.profileId, dayOfWeek: 1, startTime: "9:00 AM", endTime: "5:00 PM" },
+    ]);
+    const detail = (await getTemplateDetail(f.locationId, template.id))!;
+    const [row0, row1] = detail.rows;
+
+    const other = await createFixture();
+    try {
+      const res = (await applyTemplate(
+        f.locationId,
+        template.id,
+        { targetWeek, mode: "replace", assignments: { [row0.id]: f.ben.profileId, [row1.id]: other.ana.profileId } },
+        f.timezone,
+      ))!;
+      expect(res.created).toBe(2);
+      expect(res.openCount).toBe(1); // row1's off-team id coerced to open
+      const schedule = await prisma.schedule.findFirstOrThrow({
+        where: { locationId: f.locationId, weekStartDate: new Date(targetWeek) },
+      });
+      const shifts = await prisma.shift.findMany({ where: { scheduleId: schedule.id }, orderBy: { date: "asc" } });
+      expect(shifts[0].employeeProfileId).toBe(f.ben.profileId); // override honored
+      expect(shifts[1].employeeProfileId).toBeNull(); // off-team → open
+    } finally {
+      await destroyFixture(other);
+    }
+  });
+
+  it("returns null for a template at another location", async () => {
+    const t = await createTemplate(f.locationId, "Scoped apply", []);
+    const other = await createFixture();
+    try {
+      expect(
+        await applyTemplate(other.locationId, t.id, { targetWeek: "2026-07-06", mode: "add", assignments: {} }, other.timezone),
+      ).toBeNull();
     } finally {
       await destroyFixture(other);
     }

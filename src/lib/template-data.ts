@@ -256,3 +256,65 @@ export async function resolveTemplateForWeek(
 
   return { templateId: template.id, templateName: template.name, targetWeek, rows, occupancy: { draftCount, publishedCount } };
 }
+
+export type ApplyResult = { created: number; openCount: number; week: ISODate };
+
+export async function applyTemplate(
+  locationId: string,
+  templateId: string,
+  input: { targetWeek: ISODate; mode: "replace" | "add"; assignments: Record<string, string | null> },
+  timezone: string,
+): Promise<ApplyResult | null> {
+  const template = await prisma.scheduleTemplate.findFirst({
+    where: { id: templateId, locationId },
+    include: { rows: true },
+  });
+  if (!template) return null;
+  const targetWeek = weekStartOfISO(input.targetWeek);
+  const schedule = await getOrCreateSchedule(locationId, targetWeek);
+
+  // Requested assignee per row: explicit override, else the row's remembered default.
+  const requestedByRow = new Map(
+    template.rows.map((r) => [
+      r.id,
+      r.id in input.assignments ? input.assignments[r.id] : r.employeeProfileId,
+    ]),
+  );
+  const requestedIds = [...new Set([...requestedByRow.values()].filter((v): v is string => v !== null))];
+  const members = await prisma.employeeProfile.findMany({
+    where: { locationId, id: { in: requestedIds } },
+    select: { id: true },
+  });
+  const memberSet = new Set(members.map((m) => m.id));
+
+  const shiftData = template.rows.map((r) => {
+    const requested = requestedByRow.get(r.id) ?? null;
+    const employeeProfileId = requested && memberSet.has(requested) ? requested : null;
+    const date = addDaysISO(targetWeek, r.dayOfWeek);
+    const { startsAt, endsAt } = shiftInstants(date, parseTime12h(r.startTime)!, parseTime12h(r.endTime)!, timezone);
+    return {
+      scheduleId: schedule.id,
+      locationId,
+      positionId: r.positionId,
+      employeeProfileId,
+      date: new Date(date),
+      startsAt,
+      endsAt,
+      notes: r.notes,
+      status: "draft" as const,
+    };
+  });
+
+  const ops: Prisma.PrismaPromise<unknown>[] = [];
+  if (input.mode === "replace") {
+    ops.push(prisma.shift.deleteMany({ where: { scheduleId: schedule.id, status: "draft" } }));
+  }
+  ops.push(prisma.shift.createMany({ data: shiftData }));
+  await prisma.$transaction(ops);
+
+  return {
+    created: shiftData.length,
+    openCount: shiftData.filter((s) => s.employeeProfileId === null).length,
+    week: targetWeek,
+  };
+}
