@@ -40,3 +40,18 @@ export const updateLocationSchema = z.object({
 });
 
 export type UpdateLocationInput = z.infer<typeof updateLocationSchema>;
+
+/** New locations start with just the basics; everything else is configured
+ *  from location settings after switching to it. */
+export const createLocationSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, { message: "Enter a location name" }),
+  timezone: z
+    .string()
+    .refine((value) => IANA_TIMEZONES.has(value), { message: "Choose a valid time zone" }),
+  address: z.string().trim().max(500).nullable().optional(),
+});
+
+export type CreateLocationInput = z.infer<typeof createLocationSchema>;

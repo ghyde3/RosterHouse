@@ -7,6 +7,7 @@ import styles from "./settings.module.css";
 
 const LINKS: Array<{ href: string; label: string; exact?: boolean }> = [
   { href: "/manager/settings", label: "Location", exact: true },
+  { href: "/manager/settings/locations", label: "Locations" },
   { href: "/manager/settings/positions", label: "Positions" },
   { href: "/manager/settings/templates", label: "Templates" },
   { href: "/manager/settings/activity", label: "Activity" },

@@ -30,6 +30,7 @@ export const AUDIT_ACTIONS = [
   "drop.denied",
   "template.applied",
   "location.settings_updated",
+  "location.created",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

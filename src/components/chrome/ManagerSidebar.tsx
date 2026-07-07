@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { cx } from "@/components/ui/cx";
 import { initialsOf } from "@/components/ui/initials";
+import { LocationSwitcher } from "./LocationSwitcher";
 import styles from "./ManagerSidebar.module.css";
 
 const NAV: Array<{
@@ -26,17 +27,29 @@ const NAV: Array<{
 export type ManagerSidebarProps = {
   locationName: string;
   userName: string;
+  /** All of the org's locations; the switcher renders only when there's more than one. */
+  locations?: Array<{ id: string; name: string }>;
+  activeLocationId?: string;
 };
 
-export function ManagerSidebar({ locationName, userName }: ManagerSidebarProps) {
+export function ManagerSidebar({
+  locationName,
+  userName,
+  locations = [],
+  activeLocationId,
+}: ManagerSidebarProps) {
   const pathname = usePathname();
   return (
     <aside className={styles.sidebar}>
       <div className={styles.brand}>RosterHouse</div>
-      <div className={styles.location}>
-        <Icon name="map-pin" size={14} />
-        <span>{locationName}</span>
-      </div>
+      {locations.length > 1 && activeLocationId ? (
+        <LocationSwitcher locations={locations} activeLocationId={activeLocationId} />
+      ) : (
+        <div className={styles.location}>
+          <Icon name="map-pin" size={14} />
+          <span>{locationName}</span>
+        </div>
+      )}
       <nav className={styles.nav} aria-label="Manager">
         {NAV.map((item) => {
           const active = item.exact
