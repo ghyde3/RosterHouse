@@ -131,6 +131,68 @@ describe("getTimesheetWeekData", () => {
   });
 });
 
+describe("getTimesheetWeekData week window uses location-local midnight", () => {
+  let f: Fixture;
+  beforeAll(async () => {
+    f = await createFixture();
+  });
+  afterAll(async () => {
+    await destroyFixture(f);
+  });
+
+  it("includes a punch starting Sunday 11PM local (crosses into Monday UTC) in the NEXT week, and excludes the previous Sunday 8PM local punch", async () => {
+    // Sunday before WEEK, local 11:00 PM — its UTC instant is Monday ~03:00Z,
+    // which used to slip into the wrong week under naive UTC-midnight bounds.
+    // Here it's still the PREVIOUS week's Sunday, so per the local calendar
+    // it does NOT belong to WEEK; it belongs to the week before WEEK.
+    const prevSunday = "2026-07-05"; // Sunday before Monday WEEK
+    const entryInPrevWeek = await prisma.timeClockEntry.create({
+      data: {
+        employeeProfileId: f.ana.profileId,
+        locationId: f.locationId,
+        clockInAt: at(prevSunday, 23), // Sun 11PM local = Mon ~03:00Z
+        clockOutAt: at("2026-07-06", 23, 30),
+      },
+    });
+
+    // A punch clocking in Sunday 8PM local (two Sundays before WEEK, i.e. the
+    // last day of the week BEFORE prevWeek) must not leak into WEEK either.
+    const twoSundaysAgo = "2026-06-28";
+    const entryTwoWeeksAgo = await prisma.timeClockEntry.create({
+      data: {
+        employeeProfileId: f.ben.profileId,
+        locationId: f.locationId,
+        clockInAt: at(twoSundaysAgo, 20), // Sun 8PM local
+        clockOutAt: at(twoSundaysAgo, 22),
+      },
+    });
+
+    try {
+      // The week CONTAINING prevSunday (2026-06-29..2026-07-05) should include
+      // the Sun-11PM-local punch, because its local clock-in date is prevSunday
+      // (still inside that week) even though the UTC instant is Monday.
+      const prevWeekStart = weekStartOf(at(prevSunday, 12), f.timezone);
+      const prevWeekData = await getTimesheetWeekData(f.locationId, prevWeekStart);
+      const anaPrev = prevWeekData.employees.find((e) => e.profileId === f.ana.profileId)!;
+      expect(anaPrev.entries.some((e) => e.id === entryInPrevWeek.id)).toBe(true);
+
+      // WEEK itself (2026-07-06..2026-07-12) must NOT include that same punch,
+      // even though its UTC instant (Mon ~03:00Z) falls on/after 2026-07-06T00:00:00Z.
+      const weekData = await getTimesheetWeekData(f.locationId, WEEK);
+      const anaWeek = weekData.employees.find((e) => e.profileId === f.ana.profileId)!;
+      expect(anaWeek.entries.some((e) => e.id === entryInPrevWeek.id)).toBe(false);
+
+      // The two-Sundays-ago punch must not appear in WEEK either.
+      const benWeek = weekData.employees.find((e) => e.profileId === f.ben.profileId)!;
+      expect(benWeek.entries.some((e) => e.id === entryTwoWeeksAgo.id)).toBe(false);
+    } finally {
+      await prisma.timeClockEntry.deleteMany({
+        where: { id: { in: [entryInPrevWeek.id, entryTwoWeeksAgo.id] } },
+      });
+    }
+  });
+});
+
 describe("timesheetsToCsv", () => {
   it("emits a header and one row per entry with quoted fields", () => {
     const csv = timesheetsToCsv({

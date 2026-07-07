@@ -6,6 +6,7 @@ import {
   addDaysISO,
   formatShiftRange,
   localISODate,
+  localToUtc,
   weekDatesOf,
   type ISODate,
 } from "@/lib/time";
@@ -59,9 +60,10 @@ export async function getTimesheetWeekData(
   const location = await prisma.location.findUniqueOrThrow({ where: { id: locationId } });
   const tz = location.timezone;
   const dates = weekDatesOf(weekStart);
-  // Fetch entries whose clock-in falls inside the local week [Mon 00:00, next Mon 00:00).
-  const weekStartInstant = new Date(`${weekStart}T00:00:00.000Z`);
-  const weekEndInstant = new Date(`${addDaysISO(weekStart, 7)}T00:00:00.000Z`);
+  // Fetch entries whose clock-in falls inside the local week [Mon 00:00, next Mon 00:00),
+  // evaluated in the location's own timezone (clockInAt is a real instant).
+  const weekStartInstant = localToUtc(weekStart, { hour: 0, minute: 0 }, tz);
+  const weekEndInstant = localToUtc(addDaysISO(weekStart, 7), { hour: 0, minute: 0 }, tz);
   // The @db.Date shift column is stored UTC-midnight, so bound by date value.
   const shiftDateLo = new Date(`${weekStart}T00:00:00.000Z`);
   const shiftDateHi = new Date(`${dates[6]}T00:00:00.000Z`);

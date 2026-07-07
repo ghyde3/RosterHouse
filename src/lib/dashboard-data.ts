@@ -3,6 +3,7 @@ import { countPendingRequests } from "@/lib/requests";
 import { getScheduleWeekData } from "@/lib/schedule-data";
 import {
   addDaysISO,
+  localToUtc,
   shiftDurationHours,
   weekStartOf,
   type ISODate,
@@ -51,8 +52,8 @@ export async function getDashboardData(
         where: {
           locationId,
           clockInAt: {
-            gte: new Date(`${weekStart}T00:00:00.000Z`),
-            lt: new Date(`${addDaysISO(weekStart, 7)}T00:00:00.000Z`),
+            gte: localToUtc(weekStart, { hour: 0, minute: 0 }, timezone),
+            lt: localToUtc(addDaysISO(weekStart, 7), { hour: 0, minute: 0 }, timezone),
           },
         },
         include: { employeeProfile: true },
