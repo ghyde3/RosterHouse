@@ -1,4 +1,6 @@
 import { handleApiError, jsonErr, jsonOk } from "@/lib/api";
+import { logAudit } from "@/lib/audit";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { requireManagerForApi } from "@/lib/manager-guard";
 import { notifyUsers } from "@/lib/notify";
@@ -20,7 +22,7 @@ export async function POST(
     // Transaction flips THIS schedule and its draft shifts only — never other
     // weeks. publishedAt is set AFTER the shift updates so freshly published
     // shifts don't read as "edited after publish".
-    const employeeUserIds = await prisma.$transaction(async (tx) => {
+    const { employeeUserIds, shiftCount } = await prisma.$transaction(async (tx) => {
       await tx.shift.updateMany({
         where: { scheduleId, status: "draft" },
         data: { status: "published" },
@@ -37,7 +39,23 @@ export async function POST(
         where: { scheduleId, employeeProfileId: { not: null } },
         select: { employeeProfile: { select: { userId: true } } },
       });
-      return [...new Set(assigned.map((s) => s.employeeProfile!.userId))];
+      const count = await tx.shift.count({ where: { scheduleId } });
+      return {
+        employeeUserIds: [...new Set(assigned.map((s) => s.employeeProfile!.userId))],
+        shiftCount: count,
+      };
+    });
+
+    const session = await auth();
+    await logAudit({
+      organizationId: guard.location.organizationId,
+      locationId: guard.location.id,
+      actorUserId: guard.userId,
+      actorName: session?.user?.name ?? "Manager",
+      action: "schedule.published",
+      entityType: "Schedule",
+      entityId: scheduleId,
+      detail: { weekStartDate: toISODate(schedule.weekStartDate), shiftCount },
     });
 
     const weekLabel = formatDateShort(toISODate(schedule.weekStartDate));

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { jsonErr, jsonOk } from "@/lib/api";
+import { logAudit } from "@/lib/audit";
 import { sessionUser } from "@/lib/api-session";
 import { getManagerLocation } from "@/lib/authz";
 import { notifyUsers } from "@/lib/notify";
@@ -77,6 +78,21 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       409,
     );
   }
+
+  await logAudit({
+    organizationId: user.organizationId,
+    locationId: request.shift.locationId,
+    actorUserId: user.id,
+    actorName: user.name,
+    action: decision === "approve" ? "swap.approved" : "swap.denied",
+    entityType: "SwapRequest",
+    entityId: request.id,
+    detail: {
+      date: isoDateOf(request.shift.date),
+      requester: request.requester.user.name,
+      coverer: request.coverer?.user.name ?? null,
+    },
+  });
 
   const timezone = request.shift.location.timezone;
   const shiftLabel = `${formatMediumDate(isoDateOf(request.shift.date))} ${request.shift.position.name} shift, ${formatShiftRange(

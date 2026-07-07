@@ -5,6 +5,7 @@ import { formatDurationHrs } from "@/lib/time";
 import { SWAPS_ENABLED } from "@/lib/flags";
 import { PageTopBar } from "@/components/employee/PageTopBar";
 import { RequestSwapButton } from "@/components/employee/RequestSwapButton";
+import { DropRequestButton } from "@/components/employee/DropRequestButton";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
@@ -55,17 +56,19 @@ export default async function ShiftDetailPage({
               {shift.location.address ? ` · ${shift.location.address}` : ""}
             </span>
           </div>
-          {shift.coworkers.length === 0 ? (
+          {shift.shiftMates.length === 0 ? (
             <div className={styles.iconRow}>
               <Icon name="users" size={16} />
-              <span className={styles.muted}>No one else is scheduled during this shift.</span>
+              <span className={styles.muted}>No one else is scheduled that day.</span>
             </div>
           ) : (
-            shift.coworkers.map((c) => (
-              <div key={c.name} className={styles.iconRow}>
-                <Avatar name={c.name} size={28} />
-                <span>{c.name}</span>
-                <span className={styles.muted}>· {c.positionName}</span>
+            shift.shiftMates.map((m) => (
+              <div key={m.shiftId} className={styles.iconRow}>
+                <Avatar name={m.name} size={28} />
+                <span>{m.name}</span>
+                <span className={styles.muted}>
+                  · {m.positionName} · {m.timeRange}
+                </span>
               </div>
             ))
           )}
@@ -85,6 +88,14 @@ export default async function ShiftDetailPage({
 
       {SWAPS_ENABLED && !shift.isOpen && new Date(shift.startsAt) > new Date() && (
         <RequestSwapButton shiftId={shift.id} />
+      )}
+
+      {!shift.isOpen && new Date(shift.startsAt) > new Date() && (
+        <DropRequestButton
+          shiftId={shift.id}
+          shiftLabel={`${shift.dayLabel} ${shift.positionName.toLowerCase()} shift`}
+          hasPendingDrop={shift.hasPendingDrop}
+        />
       )}
     </div>
   );

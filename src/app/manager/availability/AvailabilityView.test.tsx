@@ -17,6 +17,7 @@ function day(over: Partial<OverviewDay> & { dayOfWeek: number }): OverviewDay {
     startTime: null,
     endTime: null,
     timeOff: false,
+    exception: false,
     ...over,
   };
 }
@@ -86,6 +87,23 @@ describe("AvailabilityView", () => {
     expect(headers).toEqual(["Line cook"]);
     expect(screen.queryByText("Ana Server")).toBeNull();
     expect(screen.queryByText("Cal NoRole")).toBeNull();
+  });
+
+  it("marks exception days with a tag on the effective cell", () => {
+    const withException = [
+      emp({
+        profileId: "eve",
+        name: "Eve Except",
+        days: [
+          day({ dayOfWeek: 0, isAvailable: false, exception: true }),
+          ...Array.from({ length: 6 }, (_, i) => day({ dayOfWeek: 1 + i })),
+        ],
+      }),
+    ];
+    render(<AvailabilityView weekStart="2026-07-06" employees={withException} positions={POSITIONS} />);
+    // "Unavailable" also appears as a status-filter option — count cells loosely.
+    expect(screen.getAllByText("Unavailable").length).toBeGreaterThan(1);
+    expect(screen.getByText("Exception")).toBeTruthy();
   });
 
   it("shows an empty state when filters exclude everyone", () => {

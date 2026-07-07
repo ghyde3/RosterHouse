@@ -19,7 +19,16 @@ const REASON_OPTIONS = [
   { value: "other", label: "Other" },
 ];
 
-export function TimeOffSection({ requests }: { requests: TimeOffItem[] }) {
+export function TimeOffSection({
+  requests,
+  vacationBalanceHours = null,
+  sickBalanceHours = null,
+}: {
+  requests: TimeOffItem[];
+  /** NULL = balance tracking off for that bucket; nothing is shown. */
+  vacationBalanceHours?: number | null;
+  sickBalanceHours?: number | null;
+}) {
   const router = useRouter();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
@@ -76,6 +85,13 @@ export function TimeOffSection({ requests }: { requests: TimeOffItem[] }) {
       <Button variant="secondary" fullWidth onClick={() => setOpen(true)}>
         Request time off
       </Button>
+      {(vacationBalanceHours !== null || sickBalanceHours !== null) && (
+        <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: 0 }}>
+          {vacationBalanceHours !== null && `You have ${vacationBalanceHours} vacation hours left.`}
+          {vacationBalanceHours !== null && sickBalanceHours !== null && " "}
+          {sickBalanceHours !== null && `You have ${sickBalanceHours} sick hours left.`}
+        </p>
+      )}
 
       {requests.length > 0 && (
         <>

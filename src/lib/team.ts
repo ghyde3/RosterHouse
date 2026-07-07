@@ -11,6 +11,8 @@ export type TeamMember = {
   primaryPositionName: string | null;
   positionIds: string[];
   hourlyRate: number | null;
+  vacationBalanceHours: number | null; // NULL = tracking off
+  sickBalanceHours: number | null; // NULL = tracking off
 };
 
 export type PendingInvite = {
@@ -40,6 +42,8 @@ export async function getTeam(locationId: string): Promise<TeamMember[]> {
     primaryPositionName: p.primaryPosition?.name ?? null,
     positionIds: p.positions.map((ep) => ep.positionId),
     hourlyRate: p.hourlyRate === null ? null : Number(p.hourlyRate),
+    vacationBalanceHours: p.vacationBalanceHours === null ? null : Number(p.vacationBalanceHours),
+    sickBalanceHours: p.sickBalanceHours === null ? null : Number(p.sickBalanceHours),
   }));
 }
 

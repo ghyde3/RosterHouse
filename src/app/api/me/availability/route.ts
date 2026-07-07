@@ -3,6 +3,8 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { jsonErr, jsonOk, parseJson } from "@/lib/api";
 import { getEmployeeContext, getMyAvailability } from "@/lib/queries/employee";
+import { getMyAvailabilityExceptions } from "@/lib/queries/availability-exceptions";
+import { todayISOIn } from "@/lib/time-format";
 
 const timeRe = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -45,7 +47,11 @@ export async function GET() {
   if (!session?.user) return jsonErr("unauthorized", "You need to sign in.", 401);
   const ctx = await getEmployeeContext(session.user.id);
   if (!ctx) return jsonErr("no_profile", "No employee profile is linked to this account.", 403);
-  return jsonOk({ rules: await getMyAvailability(ctx.profileId) });
+  const [rules, exceptions] = await Promise.all([
+    getMyAvailability(ctx.profileId),
+    getMyAvailabilityExceptions(ctx.profileId, todayISOIn(ctx.timezone)),
+  ]);
+  return jsonOk({ rules, exceptions });
 }
 
 export async function PUT(request: Request) {

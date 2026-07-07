@@ -1,4 +1,6 @@
 import { handleApiError, jsonErr, jsonOk, parseJson } from "@/lib/api";
+import { logAudit } from "@/lib/audit";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { requireManagerForApi } from "@/lib/manager-guard";
 import { updateLocationSchema } from "@/lib/location-schemas";
@@ -24,6 +26,8 @@ export async function PATCH(
         name: input.name,
         timezone: input.timezone,
         overtimeHoursPerWeek: input.overtimeHoursPerWeek,
+        minRestHours: input.minRestHours, // undefined = unchanged
+        maxConsecutiveDays: input.maxConsecutiveDays, // undefined = unchanged
         address: input.address,
       },
       select: {
@@ -31,9 +35,24 @@ export async function PATCH(
         name: true,
         timezone: true,
         overtimeHoursPerWeek: true,
+        minRestHours: true,
+        maxConsecutiveDays: true,
         address: true,
       },
     });
+
+    const session = await auth();
+    await logAudit({
+      organizationId: guard.location.organizationId,
+      locationId: guard.location.id,
+      actorUserId: guard.userId,
+      actorName: session?.user?.name ?? "Manager",
+      action: "location.settings_updated",
+      entityType: "Location",
+      entityId: locationId,
+      detail: { changed: Object.keys(input).filter((k) => input[k as keyof typeof input] !== undefined) },
+    });
+
     return jsonOk({ location: updated });
   } catch (err) {
     return handleApiError(err);

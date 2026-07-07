@@ -58,6 +58,16 @@ export function TimeOffApprovals({ pending, decided }: { pending: TimeOffItem[];
               {r.rangeLabel} · {r.reasonLabel}
               {r.note ? ` · ${r.note}` : ""}
             </div>
+            {r.balanceHours !== null && (
+              <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 2 }}>
+                {r.reasonLabel} balance: {r.balanceHours}h
+              </div>
+            )}
+            {r.balanceHours !== null && r.balanceHours - r.requestedHours < 0 && (
+              <div style={{ fontSize: 13, color: "var(--status-warning)", marginTop: 2 }}>
+                This request would take it to {r.balanceHours - r.requestedHours}h.
+              </div>
+            )}
           </div>
           <div style={{ display: "flex", gap: 8, flex: "none" }}>
             <Button variant="ghost" size="sm" disabled={busyId === r.id} onClick={() => setDenying(r)}>

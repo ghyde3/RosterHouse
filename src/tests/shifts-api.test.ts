@@ -53,6 +53,8 @@ afterAll(async () => {
   await prisma.schedule.deleteMany({
     where: { locationId, weekStartDate: { in: createdWeekStarts.map((w) => new Date(w)) } },
   });
+  // The seeded org persists, so drop the audit rows these routes wrote.
+  await prisma.auditLog.deleteMany({ where: { entityType: "Shift", entityId: { in: createdShiftIds } } });
 });
 
 describe("GET /api/locations/[locationId]/schedule", () => {

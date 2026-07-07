@@ -1,4 +1,6 @@
 import { handleApiError, jsonErr, jsonOk } from "@/lib/api";
+import { logAudit } from "@/lib/audit";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { requireManagerForApi } from "@/lib/manager-guard";
 import { updateEntrySchema } from "@/lib/timesheet-schemas";
@@ -48,6 +50,29 @@ export async function PATCH(
         editedByUserId: guard.userId,
         editedAt: new Date(),
       },
+    });
+
+    // Audit only the punch fields that actually changed, before → after.
+    const before: Record<string, string | null> = {};
+    const after: Record<string, string | null> = {};
+    if (existing.clockInAt.getTime() !== entry.clockInAt.getTime()) {
+      before.clockInAt = existing.clockInAt.toISOString();
+      after.clockInAt = entry.clockInAt.toISOString();
+    }
+    if ((existing.clockOutAt?.getTime() ?? null) !== (entry.clockOutAt?.getTime() ?? null)) {
+      before.clockOutAt = existing.clockOutAt ? existing.clockOutAt.toISOString() : null;
+      after.clockOutAt = entry.clockOutAt ? entry.clockOutAt.toISOString() : null;
+    }
+    const session = await auth();
+    await logAudit({
+      organizationId: guard.location.organizationId,
+      locationId: guard.location.id,
+      actorUserId: guard.userId,
+      actorName: session?.user?.name ?? "Manager",
+      action: "timeclock.edited",
+      entityType: "TimeClockEntry",
+      entityId: entry.id,
+      detail: { before, after },
     });
 
     return jsonOk({

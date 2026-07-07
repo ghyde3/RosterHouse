@@ -24,15 +24,34 @@ function patchReq(body: unknown): Request {
   });
 }
 
-async function makeRequest(f: Fixture, profileId: string) {
+async function makeRequest(
+  f: Fixture,
+  profileId: string,
+  opts?: { reason?: "vacation" | "sick" | "personal" | "other"; startOffset?: number; endOffset?: number },
+) {
   return prisma.timeOffRequest.create({
     data: {
       employeeProfileId: profileId,
-      startDate: new Date(isoDateFromNow(14, f.timezone)),
-      endDate: new Date(isoDateFromNow(16, f.timezone)),
-      reason: "vacation",
+      startDate: new Date(isoDateFromNow(opts?.startOffset ?? 14, f.timezone)),
+      endDate: new Date(isoDateFromNow(opts?.endOffset ?? 16, f.timezone)),
+      reason: opts?.reason ?? "vacation",
     },
   });
+}
+
+async function setBalances(profileId: string, vacation: number | null, sick: number | null) {
+  await prisma.employeeProfile.update({
+    where: { id: profileId },
+    data: { vacationBalanceHours: vacation, sickBalanceHours: sick },
+  });
+}
+
+async function balancesOf(profileId: string): Promise<{ vacation: number | null; sick: number | null }> {
+  const p = await prisma.employeeProfile.findUniqueOrThrow({ where: { id: profileId } });
+  return {
+    vacation: p.vacationBalanceHours === null ? null : Number(p.vacationBalanceHours),
+    sick: p.sickBalanceHours === null ? null : Number(p.sickBalanceHours),
+  };
 }
 
 describe("PATCH /api/time-off/[requestId]", () => {
@@ -87,6 +106,60 @@ describe("PATCH /api/time-off/[requestId]", () => {
     const res = await PATCH(patchReq({ decision: "deny" }), { params: Promise.resolve({ requestId: request.id }) });
     expect(res.status).toBe(409);
     expect((await res.json()).error.code).toBe("already_decided");
+  });
+
+  it("approving vacation deducts 8h per inclusive day and may go negative", async () => {
+    await setBalances(f.ana.profileId, 20, 10);
+    // 14..16 = 3 inclusive days = 24h → 20 - 24 = -4.
+    const request = await makeRequest(f, f.ana.profileId, { reason: "vacation" });
+    signInAs(f.managerUserId, { role: "manager", organizationId: f.orgId });
+    const res = await PATCH(patchReq({ decision: "approve" }), { params: Promise.resolve({ requestId: request.id }) });
+    expect(res.status).toBe(200);
+    expect(await balancesOf(f.ana.profileId)).toEqual({ vacation: -4, sick: 10 });
+  });
+
+  it("approving sick deducts from the sick bucket only", async () => {
+    await setBalances(f.ben.profileId, 40, 24);
+    // Single-day request = 8h.
+    const request = await makeRequest(f, f.ben.profileId, { reason: "sick", startOffset: 20, endOffset: 20 });
+    signInAs(f.managerUserId, { role: "manager", organizationId: f.orgId });
+    await PATCH(patchReq({ decision: "approve" }), { params: Promise.resolve({ requestId: request.id }) });
+    expect(await balancesOf(f.ben.profileId)).toEqual({ vacation: 40, sick: 16 });
+  });
+
+  it("approving personal deducts nothing", async () => {
+    await setBalances(f.cal.profileId, 40, 24);
+    const request = await makeRequest(f, f.cal.profileId, { reason: "personal" });
+    signInAs(f.managerUserId, { role: "manager", organizationId: f.orgId });
+    await PATCH(patchReq({ decision: "approve" }), { params: Promise.resolve({ requestId: request.id }) });
+    expect(await balancesOf(f.cal.profileId)).toEqual({ vacation: 40, sick: 24 });
+  });
+
+  it("leaves a NULL bucket untouched (tracking off)", async () => {
+    await setBalances(f.ana.profileId, null, 12);
+    const request = await makeRequest(f, f.ana.profileId, { reason: "vacation" });
+    signInAs(f.managerUserId, { role: "manager", organizationId: f.orgId });
+    const res = await PATCH(patchReq({ decision: "approve" }), { params: Promise.resolve({ requestId: request.id }) });
+    expect(res.status).toBe(200);
+    expect(await balancesOf(f.ana.profileId)).toEqual({ vacation: null, sick: 12 });
+  });
+
+  it("denying deducts nothing", async () => {
+    await setBalances(f.ben.profileId, 40, 24);
+    const request = await makeRequest(f, f.ben.profileId, { reason: "vacation" });
+    signInAs(f.managerUserId, { role: "manager", organizationId: f.orgId });
+    await PATCH(patchReq({ decision: "deny" }), { params: Promise.resolve({ requestId: request.id }) });
+    expect(await balancesOf(f.ben.profileId)).toEqual({ vacation: 40, sick: 24 });
+  });
+
+  it("a second approve 409s and does not double-deduct", async () => {
+    await setBalances(f.cal.profileId, 40, 24);
+    const request = await makeRequest(f, f.cal.profileId, { reason: "vacation" }); // 3 days = 24h
+    signInAs(f.managerUserId, { role: "manager", organizationId: f.orgId });
+    await PATCH(patchReq({ decision: "approve" }), { params: Promise.resolve({ requestId: request.id }) });
+    const again = await PATCH(patchReq({ decision: "approve" }), { params: Promise.resolve({ requestId: request.id }) });
+    expect(again.status).toBe(409);
+    expect(await balancesOf(f.cal.profileId)).toEqual({ vacation: 16, sick: 24 });
   });
 
   it("rejects employees", async () => {

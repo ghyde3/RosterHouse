@@ -10,7 +10,9 @@ export type NotificationType =
   | "timeoff_denied"
   | "claim_approved"
   | "claim_denied"
-  | "open_shift_posted";
+  | "open_shift_posted"
+  | "drop_approved"
+  | "drop_denied";
 
 const HREFS: Record<NotificationType, string> = {
   schedule_published: "/shifts",
@@ -22,6 +24,8 @@ const HREFS: Record<NotificationType, string> = {
   open_shift_posted: "/swaps",
   timeoff_approved: "/availability",
   timeoff_denied: "/availability",
+  drop_approved: "/shifts",
+  drop_denied: "/shifts",
 };
 
 export function notificationHref(type: string): string {

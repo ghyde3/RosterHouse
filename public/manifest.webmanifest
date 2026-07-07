@@ -1,0 +1,35 @@
+{
+  "name": "RosterHouse",
+  "short_name": "RosterHouse",
+  "description": "Shift scheduling for hourly teams — your shifts, always current, on the phone in your pocket.",
+  "start_url": "/shifts",
+  "display": "standalone",
+  "background_color": "#F7F3EA",
+  "theme_color": "#12312B",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

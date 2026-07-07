@@ -1,4 +1,6 @@
 import { handleApiError, jsonErr, jsonOk } from "@/lib/api";
+import { logAudit } from "@/lib/audit";
+import { auth } from "@/lib/auth";
 import { requireManagerForApi } from "@/lib/manager-guard";
 import { applyTemplateSchema } from "@/lib/template-schemas";
 import { applyTemplate } from "@/lib/template-data";
@@ -26,6 +28,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ templat
       guard.location.timezone,
     );
     if (!result) return jsonErr("not_found", "That template no longer exists", 404);
+
+    const session = await auth();
+    await logAudit({
+      organizationId: guard.location.organizationId,
+      locationId: guard.location.id,
+      actorUserId: guard.userId,
+      actorName: session?.user?.name ?? "Manager",
+      action: "template.applied",
+      entityType: "ScheduleTemplate",
+      entityId: templateId,
+      detail: { weekStartDate: result.week, shiftCount: result.created, mode: parsed.data.mode },
+    });
+
     return jsonOk({ result });
   } catch (err) {
     return handleApiError(err);

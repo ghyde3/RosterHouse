@@ -128,15 +128,20 @@ function AvailabilityCell({ day }: { day: OverviewDay }) {
   if (day.timeOff) {
     return <div className={`${styles.cell} ${styles.cellTimeOff}`}>Time off</div>;
   }
-  if (!day.isAvailable) {
-    return <div className={`${styles.cell} ${styles.cellOff}`}>Unavailable</div>;
-  }
-  if (day.startTime && day.endTime) {
-    return (
-      <div className={`${styles.cell} ${styles.cellOn}`}>
-        {hhmmTo12h(day.startTime)} – {hhmmTo12h(day.endTime)}
+  // Cells show effective availability (a one-off exception already applied
+  // by the query); the tag marks days where an exception overrides the rule.
+  const label = !day.isAvailable
+    ? "Unavailable"
+    : day.startTime && day.endTime
+      ? `${hhmmTo12h(day.startTime)} – ${hhmmTo12h(day.endTime)}`
+      : "All day";
+  const tone = day.isAvailable ? styles.cellOn : styles.cellOff;
+  return (
+    <div className={`${styles.cell} ${tone}`}>
+      <div>
+        {label}
+        {day.exception && <div className={styles.exceptionTag}>Exception</div>}
       </div>
-    );
-  }
-  return <div className={`${styles.cell} ${styles.cellOn}`}>All day</div>;
+    </div>
+  );
 }

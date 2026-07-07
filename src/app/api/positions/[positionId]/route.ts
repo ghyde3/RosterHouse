@@ -1,4 +1,6 @@
 import { handleApiError, jsonErr, jsonOk } from "@/lib/api";
+import { logAudit } from "@/lib/audit";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { requireManagerForApi } from "@/lib/manager-guard";
 import { assertNameAvailable } from "@/lib/position-data";
@@ -44,6 +46,27 @@ export async function PATCH(
       data,
       select: { id: true, name: true, sortOrder: true, archivedAt: true },
     });
+
+    const session = await auth();
+    await logAudit({
+      organizationId: guard.location.organizationId,
+      locationId: guard.location.id,
+      actorUserId: guard.userId,
+      actorName: session?.user?.name ?? "Manager",
+      // Archiving happens through this PATCH (archived: true); restores and
+      // renames are plain updates.
+      action: input.archived === true ? "position.archived" : "position.updated",
+      entityType: "Position",
+      entityId: position.id,
+      detail: {
+        name: position.name,
+        ...(input.name !== undefined && input.name !== existing.name
+          ? { before: { name: existing.name }, after: { name: position.name } }
+          : {}),
+        ...(input.archived === false ? { restored: true } : {}),
+      },
+    });
+
     return jsonOk({ position });
   } catch (err) {
     return handleApiError(err);

@@ -20,6 +20,7 @@ function day(over: Partial<OverviewDay> & { dayOfWeek: number }): OverviewDay {
     startTime: null,
     endTime: null,
     timeOff: false,
+    exception: false,
     ...over,
   };
 }

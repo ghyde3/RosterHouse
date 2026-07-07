@@ -132,6 +132,19 @@ describe("PATCH /api/time-clock-entries/[id]", () => {
     expect(after.clockOutAt?.toISOString()).toBe("2026-07-06T21:00:00.000Z");
     expect(after.editedByUserId).toBe(f.managerUserId);
     expect(after.editedAt).not.toBeNull();
+
+    // The edit lands in the org's audit trail with only the changed punch fields.
+    const audit = await prisma.auditLog.findFirstOrThrow({
+      where: { organizationId: f.orgId, action: "timeclock.edited", entityId: entry.id },
+    });
+    expect(audit.locationId).toBe(f.locationId);
+    expect(audit.actorUserId).toBe(f.managerUserId);
+    expect(audit.actorName).toBe("Test User"); // signInAs default session name
+    expect(audit.entityType).toBe("TimeClockEntry");
+    expect(audit.detail).toEqual({
+      before: { clockOutAt: null },
+      after: { clockOutAt: "2026-07-06T21:00:00.000Z" },
+    });
   });
 
   it("rejects an entry from another location (404)", async () => {

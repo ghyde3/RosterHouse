@@ -75,6 +75,10 @@ afterAll(async () => {
   await prisma.notification.deleteMany({
     where: { userId: { in: userIds }, type: "schedule_published", createdAt: { gte: startedAt } },
   });
+  // The seeded org persists, so drop the audit rows this suite wrote.
+  await prisma.auditLog.deleteMany({
+    where: { entityId: scheduleId, action: "schedule.published" },
+  });
 });
 
 describe("POST /api/schedules/[scheduleId]/publish", () => {
@@ -99,6 +103,18 @@ describe("POST /api/schedules/[scheduleId]/publish", () => {
     });
     expect(rows).toHaveLength(2);
     expect(rows[0].title).toBe("New schedule published");
+  });
+
+  it("records a schedule.published audit entry with actor and week detail", async () => {
+    const jamie = mockSession.current!.user;
+    const entry = await prisma.auditLog.findFirstOrThrow({
+      where: { organizationId: jamie.organizationId, action: "schedule.published", entityId: scheduleId },
+    });
+    expect(entry.locationId).toBe(locationId);
+    expect(entry.actorUserId).toBe(jamie.id);
+    expect(entry.actorName).toBe(jamie.name);
+    expect(entry.entityType).toBe("Schedule");
+    expect(entry.detail).toEqual({ weekStartDate: farWeek, shiftCount: 3 });
   });
 
   it("immediately after publish there are no unpublished changes", async () => {

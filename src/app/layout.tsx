@@ -1,5 +1,6 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Figtree } from "next/font/google";
+import { RegisterServiceWorker } from "@/components/RegisterServiceWorker";
 import "./globals.css";
 
 const figtree = Figtree({
@@ -12,6 +13,20 @@ export const metadata: Metadata = {
   title: "RosterHouse",
   description:
     "Shift management for hourly teams — build the schedule, publish it, and your team sees it instantly.",
+  // Manifest lives in public/ (not app/manifest.ts) so its color literals
+  // stay outside the src design-token lint rules.
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "RosterHouse",
+    statusBarStyle: "default",
+  },
+};
+
+export const viewport: Viewport = {
+  // RosterHouse Green (--green-800). rgb() because raw hex is linted out of
+  // src; keep in sync with theme_color in public/manifest.webmanifest.
+  themeColor: "rgb(18, 49, 43)",
 };
 
 export default function RootLayout({
@@ -21,7 +36,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={figtree.variable}>
-      <body>{children}</body>
+      <body>
+        <RegisterServiceWorker />
+        {children}
+      </body>
     </html>
   );
 }

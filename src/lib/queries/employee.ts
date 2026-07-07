@@ -19,6 +19,8 @@ export type EmployeeContext = {
   notifyPush: boolean;
   notifySms: boolean;
   notifyEmail: boolean;
+  vacationBalanceHours: number | null; // NULL = tracking off
+  sickBalanceHours: number | null; // NULL = tracking off
 };
 
 export async function getEmployeeContext(userId: string): Promise<EmployeeContext | null> {
@@ -43,6 +45,9 @@ export async function getEmployeeContext(userId: string): Promise<EmployeeContex
     notifyPush: profile.notifyPush,
     notifySms: profile.notifySms,
     notifyEmail: profile.notifyEmail,
+    vacationBalanceHours:
+      profile.vacationBalanceHours === null ? null : Number(profile.vacationBalanceHours),
+    sickBalanceHours: profile.sickBalanceHours === null ? null : Number(profile.sickBalanceHours),
   };
 }
 
@@ -66,6 +71,8 @@ export type MePayload = {
     notifyPush: boolean;
     notifySms: boolean;
     notifyEmail: boolean;
+    vacationBalanceHours: number | null;
+    sickBalanceHours: number | null;
   } | null;
 };
 
@@ -94,6 +101,8 @@ export async function getMe(userId: string): Promise<MePayload | null> {
           notifyPush: ctx.notifyPush,
           notifySms: ctx.notifySms,
           notifyEmail: ctx.notifyEmail,
+          vacationBalanceHours: ctx.vacationBalanceHours,
+          sickBalanceHours: ctx.sickBalanceHours,
         }
       : null,
   };
@@ -153,6 +162,14 @@ export type ShiftDetailDto = {
   notes: string | null;
   location: { name: string; address: string | null; timezone: string };
   coworkers: { name: string; positionName: string }[];
+  /**
+   * Other employees with published, assigned shifts at the same location on
+   * the same service date (whether or not they overlap in time), sorted by
+   * start time. Names and positions only — no contact details (privacy).
+   */
+  shiftMates: { shiftId: string; name: string; positionName: string; timeRange: string }[];
+  /** True when the viewer already has a pending drop request for this shift. */
+  hasPendingDrop: boolean;
 };
 
 /**
@@ -177,7 +194,10 @@ export async function getEmployeeShiftDetail(
   });
   if (!shift) return null;
 
-  const overlapping = await prisma.shift.findMany({
+  // One same-day query feeds both lists: `coworkers` keeps its original
+  // overlap-only semantics (the /api/shifts/[shiftId] contract), while
+  // `shiftMates` is everyone else working that service date.
+  const sameDay = await prisma.shift.findMany({
     where: {
       locationId: shift.locationId,
       date: shift.date,
@@ -185,8 +205,6 @@ export async function getEmployeeShiftDetail(
       id: { not: shift.id },
       employeeProfileId: { not: null },
       NOT: { employeeProfileId: viewer.profileId },
-      startsAt: { lt: shift.endsAt },
-      endsAt: { gt: shift.startsAt },
     },
     include: { employeeProfile: { include: { user: true } }, position: true },
     orderBy: { startsAt: "asc" },
@@ -194,12 +212,30 @@ export async function getEmployeeShiftDetail(
 
   const seen = new Set<string>();
   const coworkers: { name: string; positionName: string }[] = [];
-  for (const s of overlapping) {
+  for (const s of sameDay) {
     const p = s.employeeProfile;
     if (!p || seen.has(p.id)) continue;
+    if (!(s.startsAt < shift.endsAt && s.endsAt > shift.startsAt)) continue;
     seen.add(p.id);
     coworkers.push({ name: p.user.name, positionName: s.position.name });
   }
+
+  const shiftMates = sameDay
+    .filter((s) => s.employeeProfile !== null)
+    .map((s) => ({
+      shiftId: s.id,
+      name: s.employeeProfile!.user.name,
+      positionName: s.position.name,
+      timeRange: formatShiftRange(s.startsAt, s.endsAt, viewer.timezone),
+    }));
+
+  const pendingDrop =
+    shift.employeeProfileId === viewer.profileId
+      ? await prisma.dropRequest.findFirst({
+          where: { shiftId: shift.id, requestingEmployeeProfileId: viewer.profileId, status: "pending" },
+          select: { id: true },
+        })
+      : null;
 
   const dateISO = shift.date.toISOString().slice(0, 10);
   return {
@@ -219,6 +255,8 @@ export async function getEmployeeShiftDetail(
       timezone: shift.location.timezone,
     },
     coworkers,
+    shiftMates,
+    hasPendingDrop: pendingDrop !== null,
   };
 }
 

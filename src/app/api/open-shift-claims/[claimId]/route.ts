@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { jsonErr, jsonOk } from "@/lib/api";
+import { logAudit } from "@/lib/audit";
 import { sessionUser } from "@/lib/api-session";
 import { getManagerLocation } from "@/lib/authz";
 import { notifyUsers } from "@/lib/notify";
@@ -87,6 +88,21 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ claimId: stri
       409,
     );
   }
+
+  await logAudit({
+    organizationId: user.organizationId,
+    locationId: claim.shift.locationId,
+    actorUserId: user.id,
+    actorName: user.name,
+    action: decision === "approve" ? "claim.approved" : "claim.denied",
+    entityType: "OpenShiftClaim",
+    entityId: claim.id,
+    detail: {
+      date: isoDateOf(claim.shift.date),
+      employee: claim.employeeProfile.user.name,
+      position: claim.shift.position.name,
+    },
+  });
 
   const timezone = claim.shift.location.timezone;
   const shiftLabel = `${formatMediumDate(isoDateOf(claim.shift.date))} ${claim.shift.position.name} shift, ${formatShiftRange(

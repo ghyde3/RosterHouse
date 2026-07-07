@@ -279,6 +279,12 @@ function EditMemberDialog({
   const [primaryPositionId, setPrimaryPositionId] = useState(member.primaryPositionId ?? "");
   const [positionIds, setPositionIds] = useState<string[]>(member.positionIds);
   const [hourlyRate, setHourlyRate] = useState(member.hourlyRate === null ? "" : String(member.hourlyRate));
+  const [vacationBalance, setVacationBalance] = useState(
+    member.vacationBalanceHours === null ? "" : String(member.vacationBalanceHours),
+  );
+  const [sickBalance, setSickBalance] = useState(
+    member.sickBalanceHours === null ? "" : String(member.sickBalanceHours),
+  );
   const [confirmingDeactivate, setConfirmingDeactivate] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -314,11 +320,21 @@ function EditMemberDialog({
       setError("Hourly rate needs to be a number, like 16.50.");
       return;
     }
+    if (vacationBalance.trim() !== "" && Number.isNaN(Number(vacationBalance))) {
+      setError("Vacation balance needs to be a number of hours, like 40.");
+      return;
+    }
+    if (sickBalance.trim() !== "" && Number.isNaN(Number(sickBalance))) {
+      setError("Sick balance needs to be a number of hours, like 24.");
+      return;
+    }
     await patch(
       {
         primaryPositionId: primaryPositionId || null,
         positionIds,
         hourlyRate: hourlyRate.trim() === "" ? null : Number(hourlyRate),
+        vacationBalanceHours: vacationBalance.trim() === "" ? null : Number(vacationBalance),
+        sickBalanceHours: sickBalance.trim() === "" ? null : Number(sickBalance),
       },
       "Changes saved",
     );
@@ -400,6 +416,28 @@ function EditMemberDialog({
           </div>
         </div>
         <Input label="Hourly rate ($)" placeholder="16.50" value={hourlyRate} onChange={(e) => setHourlyRate(e.target.value)} />
+        <div style={{ display: "flex", gap: 10 }}>
+          <div style={{ flex: 1 }}>
+            <Input
+              label="Vacation balance (hours)"
+              placeholder="40"
+              value={vacationBalance}
+              onChange={(e) => setVacationBalance(e.target.value)}
+            />
+          </div>
+          <div style={{ flex: 1 }}>
+            <Input
+              label="Sick balance (hours)"
+              placeholder="24"
+              value={sickBalance}
+              onChange={(e) => setSickBalance(e.target.value)}
+            />
+          </div>
+        </div>
+        <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: 0 }}>
+          Approved vacation and sick time is deducted automatically. Leave a balance blank to turn tracking off for
+          that bucket.
+        </p>
         {error && (
           <p role="alert" style={{ fontSize: 13, color: "var(--status-danger)" }}>{error}</p>
         )}
