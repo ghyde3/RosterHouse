@@ -112,11 +112,28 @@ model User {
   role           UserRole
   createdAt      DateTime @default(now())
 
-  organization  Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  profiles      EmployeeProfile[]
-  notifications Notification[]
-  pushDevices   PushDevice[]
-  sentInvites   Invite[]          @relation("Inviter")
+  organization        Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  profiles            EmployeeProfile[]
+  notifications       Notification[]
+  pushDevices         PushDevice[]
+  sentInvites         Invite[]             @relation("Inviter")
+  passwordResetTokens PasswordResetToken[]
+}
+
+// Single-use, short-lived token behind the self-serve /reset-password flow.
+// Mirrors the Invite token pattern: plaintext unique token, expiry checked at
+// read time, consumed via a conditional update so double-submits can't reuse it.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 // One membership per (user, location). Managers may also hold profiles for

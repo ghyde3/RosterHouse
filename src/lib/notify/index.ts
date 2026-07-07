@@ -1,6 +1,7 @@
 import type { NotificationType } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db";
-import { consoleDriver } from "./console-driver";
+import { defaultDriver } from "./driver";
+import { PushSubscriptionGoneError } from "./errors";
 import { smsBodyFor } from "./templates";
 
 export type NotifyInput = {
@@ -22,7 +23,7 @@ export interface ChannelDriver {
  */
 export async function notifyUsers(
   inputs: NotifyInput[],
-  driver: ChannelDriver = consoleDriver,
+  driver: ChannelDriver = defaultDriver(),
 ): Promise<{ count: number }> {
   let count = 0;
   for (const input of inputs) {
@@ -36,15 +37,32 @@ export async function notifyUsers(
     const prefs = user.profiles[0] ?? null;
     const channels: string[] = [];
 
+    // A failing channel must not abort the fan-out or skip the in-app row —
+    // channelsSent records only what was actually handed to the provider.
     if (prefs?.notifySms && user.phone) {
-      await driver.sendSms(user.phone, smsBodyFor(input));
-      channels.push("sms");
+      try {
+        await driver.sendSms(user.phone, smsBodyFor(input));
+        channels.push("sms");
+      } catch (err) {
+        console.error(`[notify] sms delivery failed for user ${user.id}`, err);
+      }
     }
     if (prefs?.notifyPush && user.pushDevices.length > 0) {
+      let delivered = false;
       for (const device of user.pushDevices) {
-        await driver.sendPush(device.token, { title: input.title, body: input.body });
+        try {
+          await driver.sendPush(device.token, { title: input.title, body: input.body });
+          delivered = true;
+        } catch (err) {
+          if (err instanceof PushSubscriptionGoneError) {
+            // The push service says this subscription is dead — drop it.
+            await prisma.pushDevice.delete({ where: { id: device.id } }).catch(() => {});
+          } else {
+            console.error(`[notify] push delivery failed for user ${user.id}`, err);
+          }
+        }
       }
-      channels.push("push");
+      if (delivered) channels.push("push");
     }
 
     await prisma.notification.create({
