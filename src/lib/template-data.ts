@@ -3,6 +3,8 @@ import { prisma } from "@/lib/db";
 import { Prisma } from "@/generated/prisma/client";
 import type { TemplateRowInput } from "@/lib/template-schemas";
 import { getOrCreateSchedule, getScheduleWeekData } from "@/lib/schedule-data";
+import { buildConflictContext } from "@/lib/conflict-context";
+import { detectConflicts, type Conflict } from "@/lib/conflicts";
 import {
   addDaysISO,
   dayOfWeekMon0,
@@ -168,4 +170,89 @@ export async function snapshotWeekToRows(
       notes: s.notes,
     };
   });
+}
+
+export type ResolvedRow = {
+  rowId: string;
+  positionId: string;
+  positionName: string;
+  dayOfWeek: number;
+  date: ISODate;
+  startTime: string;
+  endTime: string;
+  timeRange: string;
+  notes: string | null;
+  defaultEmployeeProfileId: string | null; // remembered assignee, only if still valid
+  defaultEmployeeName: string | null;
+  employeeValid: boolean;
+  conflicts: Conflict[];
+};
+export type TemplatePreview = {
+  templateId: string;
+  templateName: string;
+  targetWeek: ISODate;
+  rows: ResolvedRow[];
+  occupancy: { draftCount: number; publishedCount: number };
+};
+
+export async function resolveTemplateForWeek(
+  locationId: string,
+  templateId: string,
+  targetWeekInput: ISODate,
+  timezone: string,
+): Promise<TemplatePreview | null> {
+  const template = await prisma.scheduleTemplate.findFirst({
+    where: { id: templateId, locationId },
+    include: { rows: { include: TEMPLATE_ROW_INCLUDE } },
+  });
+  if (!template) return null;
+  const targetWeek = weekStartOfISO(targetWeekInput);
+  const schedule = await getOrCreateSchedule(locationId, targetWeek);
+
+  const rememberedIds = [
+    ...new Set(template.rows.map((r) => r.employeeProfileId).filter((id): id is string => id !== null)),
+  ];
+  const [draftCount, publishedCount, validProfiles] = await Promise.all([
+    prisma.shift.count({ where: { scheduleId: schedule.id, status: "draft" } }),
+    prisma.shift.count({ where: { scheduleId: schedule.id, status: "published" } }),
+    prisma.employeeProfile.findMany({ where: { locationId, id: { in: rememberedIds } }, select: { id: true } }),
+  ]);
+  const validSet = new Set(validProfiles.map((p) => p.id));
+
+  // One conflict context per still-valid employee, reused across their rows.
+  const contexts = new Map(
+    await Promise.all(
+      [...validSet].map(async (id) => [id, await buildConflictContext(id, targetWeek)] as const),
+    ),
+  );
+
+  const rows = sortRows(template.rows.map(toTemplateRow)).map((r): ResolvedRow => {
+    const date = addDaysISO(targetWeek, r.dayOfWeek);
+    const employeeValid = r.employeeProfileId !== null && validSet.has(r.employeeProfileId);
+    let conflicts: Conflict[] = [];
+    if (employeeValid) {
+      const { startsAt, endsAt } = shiftInstants(date, parseTime12h(r.startTime)!, parseTime12h(r.endTime)!, timezone);
+      conflicts = detectConflicts(
+        { employeeProfileId: r.employeeProfileId, date, startsAt, endsAt },
+        contexts.get(r.employeeProfileId!)!,
+      );
+    }
+    return {
+      rowId: r.id,
+      positionId: r.positionId,
+      positionName: r.positionName,
+      dayOfWeek: r.dayOfWeek,
+      date,
+      startTime: r.startTime,
+      endTime: r.endTime,
+      timeRange: `${r.startTime} – ${r.endTime}`,
+      notes: r.notes,
+      defaultEmployeeProfileId: employeeValid ? r.employeeProfileId : null,
+      defaultEmployeeName: employeeValid ? r.employeeName : null,
+      employeeValid,
+      conflicts,
+    };
+  });
+
+  return { templateId: template.id, templateName: template.name, targetWeek, rows, occupancy: { draftCount, publishedCount } };
 }
