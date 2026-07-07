@@ -19,6 +19,20 @@ export const COMMON_US_TIMEZONES: SelectOption[] = [
   { value: "Pacific/Honolulu", label: "Hawaii — Pacific/Honolulu" },
 ];
 
+/**
+ * Trimmed overtime-hours input → a valid PATCH value, or `"invalid"` if it's
+ * non-empty but not a finite number (e.g. Number(trimmed) is NaN/Infinity).
+ * A real type="number" input can't produce such a string through typing, but
+ * paste, autofill, and non-JS API callers all can — this guard is the last
+ * line of defense against Number("junk") silently coercing to null and
+ * turning off overtime conflicts for the location.
+ */
+export function parseOvertimeInput(trimmed: string): number | null | "invalid" {
+  if (trimmed === "") return null;
+  const n = Number(trimmed);
+  return Number.isFinite(n) ? n : "invalid";
+}
+
 export type LocationSettingsFormProps = {
   locationId: string;
   name: string;
@@ -37,8 +51,10 @@ export function LocationSettingsForm({
   const router = useRouter();
   const { toast } = useToast();
   const [name, setName] = useState(initialName);
+  const [nameError, setNameError] = useState<string | undefined>(undefined);
   const [timezone, setTimezone] = useState(initialTimezone);
   const [overtime, setOvertime] = useState(initialOvertime === null ? "" : String(initialOvertime));
+  const [overtimeError, setOvertimeError] = useState<string | undefined>(undefined);
   const [address, setAddress] = useState(initialAddress ?? "");
   const [saving, setSaving] = useState(false);
 
@@ -49,13 +65,26 @@ export function LocationSettingsForm({
     : [...COMMON_US_TIMEZONES, { value: timezone, label: timezone }];
 
   async function handleSave() {
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      setNameError("Name your location");
+      return;
+    }
+    setNameError(undefined);
+
+    const parsedOvertime = parseOvertimeInput(overtime.trim());
+    if (parsedOvertime === "invalid") {
+      setOvertimeError("Enter a number, like 40");
+      return;
+    }
+    setOvertimeError(undefined);
+
     if (timezone !== initialTimezone) {
       const ok = window.confirm(
         "Changing the time zone changes how all existing times display. Save anyway?",
       );
       if (!ok) return;
     }
-    const trimmedOvertime = overtime.trim();
     const trimmedAddress = address.trim();
     setSaving(true);
     try {
@@ -63,9 +92,9 @@ export function LocationSettingsForm({
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          name: name.trim(),
+          name: trimmedName,
           timezone,
-          overtimeHoursPerWeek: trimmedOvertime === "" ? null : Number(trimmedOvertime),
+          overtimeHoursPerWeek: parsedOvertime,
           address: trimmedAddress === "" ? null : trimmedAddress,
         }),
       });
@@ -89,6 +118,7 @@ export function LocationSettingsForm({
       <Input
         label="Location name"
         value={name}
+        error={nameError}
         onChange={(e) => setName(e.target.value)}
       />
       <Select
@@ -103,6 +133,7 @@ export function LocationSettingsForm({
         min={0}
         placeholder="Leave blank to turn off overtime conflicts"
         value={overtime}
+        error={overtimeError}
         onChange={(e) => setOvertime(e.target.value)}
       />
       <Input

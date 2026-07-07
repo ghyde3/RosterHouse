@@ -7,7 +7,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: refreshMock, pu
 const toastMock = vi.fn();
 vi.mock("@/components/ui/Toaster", () => ({ useToast: () => ({ toast: toastMock }) }));
 
-import { LocationSettingsForm } from "@/app/manager/settings/LocationSettingsForm";
+import { LocationSettingsForm, parseOvertimeInput } from "@/app/manager/settings/LocationSettingsForm";
 
 let fetchMock: ReturnType<typeof vi.fn>;
 beforeEach(() => {
@@ -38,6 +38,28 @@ function renderForm() {
     />,
   );
 }
+
+describe("parseOvertimeInput", () => {
+  it("returns null for a blank field (overtime conflicts off)", () => {
+    expect(parseOvertimeInput("")).toBeNull();
+  });
+
+  it("returns the parsed number for valid input", () => {
+    expect(parseOvertimeInput("40")).toBe(40);
+    expect(parseOvertimeInput("40.5")).toBe(40.5);
+  });
+
+  it("flags non-empty junk as invalid instead of coercing NaN to null", () => {
+    // A real type="number" input can't produce these strings by typing, but
+    // paste, autofill, or a non-JS API caller can — Number("junk") is NaN,
+    // which the old code silently serialized as null (turning off overtime
+    // conflicts). The guard must catch it before it ever reaches the PATCH.
+    expect(parseOvertimeInput("abc")).toBe("invalid");
+    expect(parseOvertimeInput("-")).toBe("invalid");
+    expect(parseOvertimeInput("NaN")).toBe("invalid");
+    expect(parseOvertimeInput("Infinity")).toBe("invalid");
+  });
+});
 
 describe("LocationSettingsForm", () => {
   it("prefills the current config", () => {
@@ -85,6 +107,15 @@ describe("LocationSettingsForm", () => {
     const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
     expect(body.overtimeHoursPerWeek).toBeNull();
     expect(body.address).toBeNull();
+  });
+
+  it("rejects an empty location name inline without calling the API", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderForm();
+    fireEvent.change(screen.getByLabelText("Location name"), { target: { value: "   " } });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(screen.getByText("Name your location")).toBeInTheDocument());
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("shows a danger toast when the API rejects", async () => {
