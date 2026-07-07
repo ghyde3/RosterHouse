@@ -17,6 +17,9 @@ import { POST as clockIn } from "@/app/api/time-clock/clock-in/route";
 import { POST as clockOut } from "@/app/api/time-clock/clock-out/route";
 import { createFixture, createShiftAt, destroyFixture, type Fixture } from "./helpers/factory";
 import { signInAs } from "./helpers/auth";
+import { localToUtc } from "@/lib/time";
+import { TZDate } from "@date-fns/tz";
+import { format } from "date-fns";
 
 function post(body: unknown) {
   return new Request("http://test/api/time-clock", {
@@ -67,9 +70,15 @@ describe("time clock API", () => {
     // Backdate the punch so the elapsed duration is measurable — the
     // clock-in/clock-out calls above happen within milliseconds of each
     // other in test time, which would otherwise round to 0.0 hours.
+    // Clamp to the fixture location's local midnight so this stays within
+    // "today" (hoursToday only sums entries since local midnight) even when
+    // the suite runs in the first couple hours after midnight ET.
+    const todayISO = format(new TZDate(now, f.timezone), "yyyy-MM-dd");
+    const localMidnight = localToUtc(todayISO, { hour: 0, minute: 0 }, f.timezone);
+    const backdated = new Date(Math.max(now - 2 * 60 * 60 * 1000, localMidnight.getTime()));
     await prisma.timeClockEntry.update({
       where: { id: json.data.entryId },
-      data: { clockInAt: new Date(now - 2 * 60 * 60 * 1000) },
+      data: { clockInAt: backdated },
     });
 
     // Clock out returns hours worked today
