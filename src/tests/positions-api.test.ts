@@ -11,6 +11,7 @@ vi.mock("@/lib/auth", () => ({ auth: vi.fn(async () => mockSession.current) }));
 import { prisma } from "@/lib/db";
 import { POST as createPosition } from "@/app/api/positions/route";
 import { PATCH as patchPosition } from "@/app/api/positions/[positionId]/route";
+import { PATCH as reorderPositions } from "@/app/api/positions/reorder/route";
 import { createFixture, destroyFixture, type Fixture } from "./helpers/factory";
 
 let f: Fixture;
@@ -132,5 +133,51 @@ describe("PATCH /api/positions/[positionId]", () => {
     } finally {
       await destroyFixture(other);
     }
+  });
+});
+
+describe("PATCH /api/positions/reorder", () => {
+  function reorderRequest(body: unknown): Request {
+    return new Request("http://test/api/positions/reorder", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  }
+
+  it("assigns sortOrder by index across the passed ids", async () => {
+    const a = await prisma.position.create({ data: { locationId: f.locationId, name: "Reorder A", sortOrder: 60 } });
+    const b = await prisma.position.create({ data: { locationId: f.locationId, name: "Reorder B", sortOrder: 61 } });
+    const c = await prisma.position.create({ data: { locationId: f.locationId, name: "Reorder C", sortOrder: 62 } });
+
+    const res = await reorderPositions(reorderRequest({ orderedIds: [c.id, a.id, b.id] }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+
+    const rows = await prisma.position.findMany({
+      where: { id: { in: [a.id, b.id, c.id] } },
+    });
+    const byId = new Map(rows.map((r) => [r.id, r.sortOrder]));
+    expect(byId.get(c.id)).toBe(0);
+    expect(byId.get(a.id)).toBe(1);
+    expect(byId.get(b.id)).toBe(2);
+  });
+
+  it("403s when an id belongs to another location (tenancy)", async () => {
+    const other = await createFixture();
+    try {
+      const mine = await prisma.position.create({ data: { locationId: f.locationId, name: "Mine reorder", sortOrder: 70 } });
+      const res = await reorderPositions(reorderRequest({ orderedIds: [mine.id, other.positionIds.server] }));
+      expect(res.status).toBe(403);
+      expect((await res.json()).error.code).toBe("forbidden");
+    } finally {
+      await destroyFixture(other);
+    }
+  });
+
+  it("400s on an empty orderedIds array", async () => {
+    const res = await reorderPositions(reorderRequest({ orderedIds: [] }));
+    expect(res.status).toBe(400);
   });
 });
