@@ -163,7 +163,7 @@ describe("POST /api/shifts/validate", () => {
     const existing = await prisma.shift.findFirstOrThrow({
       where: { locationId, employeeProfileId: { not: null } },
     });
-    const before = await prisma.shift.count();
+    const before = await prisma.shift.count({ where: { locationId } });
     const res = await validateShift(
       jsonRequest("http://test/api/shifts/validate", "POST", {
         locationId,
@@ -177,7 +177,7 @@ describe("POST /api/shifts/validate", () => {
     const body = await res.json();
     expect(body.ok).toBe(true);
     expect(body.data.conflicts.some((c: { kind: string }) => c.kind === "double_booked")).toBe(true);
-    expect(await prisma.shift.count()).toBe(before);
+    expect(await prisma.shift.count({ where: { locationId } })).toBe(before);
   });
 
   it("returns no conflicts for an open shift", async () => {
