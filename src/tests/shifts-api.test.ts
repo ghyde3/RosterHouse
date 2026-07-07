@@ -156,6 +156,34 @@ describe("POST /api/shifts", () => {
     expect(body.ok).toBe(false);
     expect(body.error.message).toBe("Enter a time like 7:00 AM");
   });
+
+  it("404s creating a shift on an archived position", async () => {
+    const archived = await prisma.position.create({
+      data: { locationId, name: "Archived for shift-create test", sortOrder: 999, archivedAt: new Date() },
+    });
+    try {
+      const res = await createShift(
+        jsonRequest("http://test/api/shifts", "POST", {
+          locationId,
+          positionId: archived.id,
+          employeeProfileId: null,
+          date: "2026-07-06",
+          startTime: "9:00 AM",
+          endTime: "5:00 PM",
+        }),
+      );
+      expect(res.status).toBe(404);
+      const body = await res.json();
+      expect(body.ok).toBe(false);
+      expect(body.error.code).toBe("not_found");
+      expect(body.error.message).toBe("That position doesn't exist at this location");
+    } finally {
+      // Defensive: if the guard under test failed open, a shift may have been
+      // created against this position — delete it before the position itself.
+      await prisma.shift.deleteMany({ where: { positionId: archived.id } });
+      await prisma.position.delete({ where: { id: archived.id } });
+    }
+  });
 });
 
 describe("POST /api/shifts/validate", () => {

@@ -236,7 +236,7 @@ export default function ScheduleView({
       <AssignShiftDialog
         open={dialogOpen}
         locationId={locationId}
-        positions={data.positions}
+        positions={data.positions.filter((p) => !p.archived)}
         weekDates={weekDatesOf(week)}
         employees={employees}
         initial={dialogInitial}

@@ -17,7 +17,7 @@ function weekData(overrides: Partial<ScheduleWeekData> = {}): ScheduleWeekData {
   return {
     schedule: { id: "sched-1", status: "draft", publishedAt: null, hasUnpublishedChanges: false },
     weekStart: "2026-07-06",
-    positions: [{ id: "pos-server", name: "Server" }],
+    positions: [{ id: "pos-server", name: "Server", archived: false }],
     shifts: [],
     conflictCount: 0,
     assignedEmployeeCount: 0,
@@ -58,6 +58,27 @@ describe("ScheduleView header", () => {
     render(<ScheduleView {...baseProps} data={weekData()} />);
     fireEvent.click(screen.getByText("Add shift"));
     expect(screen.getByText("Assign shift")).toBeTruthy(); // dialog title
+  });
+
+  it("excludes an archived position (kept in the grid) from the assign-shift picker", () => {
+    render(
+      <ScheduleView
+        {...baseProps}
+        data={weekData({
+          positions: [
+            { id: "pos-server", name: "Server", archived: false },
+            { id: "pos-busser", name: "Busser", archived: true },
+          ],
+        })}
+      />,
+    );
+    // Grid still renders the archived-with-shift-this-week position header,
+    // via WeekGrid's positionLabel (present before the dialog is even open).
+    expect(screen.getByText("Busser")).toBeTruthy();
+    fireEvent.click(screen.getByText("Add shift"));
+    // ...but the assign dialog's Position select must not offer it as an option.
+    expect(screen.queryByRole("option", { name: "Busser" })).toBeNull();
+    expect(screen.getByRole("option", { name: "Server" })).toBeTruthy();
   });
 
   it("draft week shows the publish button with the assigned count in the dialog", () => {

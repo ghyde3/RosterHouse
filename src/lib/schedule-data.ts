@@ -38,7 +38,7 @@ export type ScheduleWeekData = {
     hasUnpublishedChanges: boolean;
   };
   weekStart: ISODate;
-  positions: { id: string; name: string }[];
+  positions: { id: string; name: string; archived: boolean }[];
   shifts: ScheduleShift[];
   conflictCount: number;
   assignedEmployeeCount: number;
@@ -112,7 +112,7 @@ export async function getScheduleWeekData(
   const location = await prisma.location.findUniqueOrThrow({ where: { id: locationId } });
   const schedule = await getOrCreateSchedule(locationId, weekStart);
   const [positions, shifts] = await Promise.all([
-    prisma.position.findMany({ where: { locationId, archivedAt: null }, orderBy: { sortOrder: "asc" } }),
+    prisma.position.findMany({ where: { locationId }, orderBy: { sortOrder: "asc" } }),
     prisma.shift.findMany({
       where: { scheduleId: schedule.id },
       include: { position: true, employeeProfile: { include: { user: true } } },
@@ -159,23 +159,22 @@ export async function getScheduleWeekData(
     );
 
   // Grid rows = active positions ∪ positions referenced by this week's shifts,
-  // so an archived role that still has a shift this week keeps rendering.
-  const gridPositions = new Map<string, { id: string; name: string; sortOrder: number }>();
+  // so an archived role that still has a shift this week keeps rendering
+  // (flagged `archived: true` so callers like the assign-shift picker can
+  // exclude it as an option while the grid still shows it).
+  const positionIdsWithShiftThisWeek = new Set(shifts.map((s) => s.positionId));
+  const gridPositions = new Map<
+    string,
+    { id: string; name: string; sortOrder: number; archived: boolean }
+  >();
   for (const p of positions) {
-    gridPositions.set(p.id, { id: p.id, name: p.name, sortOrder: p.sortOrder });
-  }
-  for (const s of shifts) {
-    if (!gridPositions.has(s.positionId)) {
-      gridPositions.set(s.positionId, {
-        id: s.positionId,
-        name: s.position.name,
-        sortOrder: s.position.sortOrder,
-      });
-    }
+    const archived = p.archivedAt !== null;
+    if (archived && !positionIdsWithShiftThisWeek.has(p.id)) continue;
+    gridPositions.set(p.id, { id: p.id, name: p.name, sortOrder: p.sortOrder, archived });
   }
   const orderedGridPositions = [...gridPositions.values()]
     .sort((a, b) => a.sortOrder - b.sortOrder)
-    .map((p) => ({ id: p.id, name: p.name }));
+    .map((p) => ({ id: p.id, name: p.name, archived: p.archived }));
 
   return {
     schedule: {

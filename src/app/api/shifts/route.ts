@@ -29,7 +29,7 @@ export async function POST(req: Request) {
       return jsonErr("forbidden", "You don't have access to this location", 403);
     }
     const position = await prisma.position.findFirst({
-      where: { id: input.positionId, locationId: input.locationId },
+      where: { id: input.positionId, locationId: input.locationId, archivedAt: null },
     });
     if (!position) {
       return jsonErr("not_found", "That position doesn't exist at this location", 404);

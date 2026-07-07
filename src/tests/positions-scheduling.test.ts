@@ -27,7 +27,7 @@ describe("getScheduleWeekData archive-awareness", () => {
     expect(data.positions.some((p) => p.id === f.positionIds.server)).toBe(true);
   });
 
-  it("KEEPS an archived position that has a shift in the viewed week", async () => {
+  it("KEEPS an archived position that has a shift in the viewed week, flagged as archived", async () => {
     const archivedWithShift = await prisma.position.create({
       data: { locationId: f.locationId, name: "Archived with shift", sortOrder: 81 },
     });
@@ -43,7 +43,12 @@ describe("getScheduleWeekData archive-awareness", () => {
 
     const weekStart = weekStartOfISO(isoDateFromNow(0, f.timezone));
     const data = await getScheduleWeekData(f.locationId, weekStart);
-    expect(data.positions.some((p) => p.id === archivedWithShift.id)).toBe(true);
+    const row = data.positions.find((p) => p.id === archivedWithShift.id);
+    expect(row).toBeDefined();
+    expect(row?.archived).toBe(true);
+    // A still-active fixture position is flagged non-archived.
+    const server = data.positions.find((p) => p.id === f.positionIds.server);
+    expect(server?.archived).toBe(false);
 
     await prisma.shift.delete({ where: { id: shift.id } });
   });
