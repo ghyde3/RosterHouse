@@ -14,7 +14,7 @@ export default async function TeamPage() {
   const [members, pendingInvites, positions] = await Promise.all([
     getTeam(location.id),
     getPendingInvites(location.id),
-    prisma.position.findMany({ where: { locationId: location.id }, orderBy: { sortOrder: "asc" } }),
+    prisma.position.findMany({ where: { locationId: location.id, archivedAt: null }, orderBy: { sortOrder: "asc" } }),
   ]);
 
   return (

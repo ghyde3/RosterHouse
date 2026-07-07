@@ -112,7 +112,7 @@ export async function getScheduleWeekData(
   const location = await prisma.location.findUniqueOrThrow({ where: { id: locationId } });
   const schedule = await getOrCreateSchedule(locationId, weekStart);
   const [positions, shifts] = await Promise.all([
-    prisma.position.findMany({ where: { locationId }, orderBy: { sortOrder: "asc" } }),
+    prisma.position.findMany({ where: { locationId, archivedAt: null }, orderBy: { sortOrder: "asc" } }),
     prisma.shift.findMany({
       where: { scheduleId: schedule.id },
       include: { position: true, employeeProfile: { include: { user: true } } },
@@ -158,6 +158,25 @@ export async function getScheduleWeekData(
         (schedule.publishedAt !== null && s.updatedAt > schedule.publishedAt),
     );
 
+  // Grid rows = active positions ∪ positions referenced by this week's shifts,
+  // so an archived role that still has a shift this week keeps rendering.
+  const gridPositions = new Map<string, { id: string; name: string; sortOrder: number }>();
+  for (const p of positions) {
+    gridPositions.set(p.id, { id: p.id, name: p.name, sortOrder: p.sortOrder });
+  }
+  for (const s of shifts) {
+    if (!gridPositions.has(s.positionId)) {
+      gridPositions.set(s.positionId, {
+        id: s.positionId,
+        name: s.position.name,
+        sortOrder: s.position.sortOrder,
+      });
+    }
+  }
+  const orderedGridPositions = [...gridPositions.values()]
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map((p) => ({ id: p.id, name: p.name }));
+
   return {
     schedule: {
       id: schedule.id,
@@ -166,7 +185,7 @@ export async function getScheduleWeekData(
       hasUnpublishedChanges,
     },
     weekStart,
-    positions: positions.map((p) => ({ id: p.id, name: p.name })),
+    positions: orderedGridPositions,
     shifts: annotated,
     conflictCount: annotated.filter((s) => s.uiStatus === "conflict").length,
     assignedEmployeeCount: employeeIds.length,

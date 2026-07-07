@@ -12,7 +12,7 @@ export default async function TemplateEditorPage({ params }: { params: Promise<{
   const location = await getManagerLocation(user.id);
   const [template, positions, employees] = await Promise.all([
     getTemplateDetail(location.id, templateId),
-    prisma.position.findMany({ where: { locationId: location.id }, orderBy: { sortOrder: "asc" } }),
+    prisma.position.findMany({ where: { locationId: location.id, archivedAt: null }, orderBy: { sortOrder: "asc" } }),
     getAssignableEmployees(location.id),
   ]);
   if (!template) notFound();
