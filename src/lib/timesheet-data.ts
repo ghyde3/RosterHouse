@@ -160,3 +160,41 @@ export async function getTimesheetWeekData(
 
   return { weekStart, overtimeHoursPerWeek: location.overtimeHoursPerWeek, employees };
 }
+
+/** RFC-4180 field: quote when it contains a comma, quote, or newline. */
+function csvField(value: string): string {
+  if (/[",\n\r]/.test(value)) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
+}
+
+/** One header row + one row per entry across all employees. */
+export function timesheetsToCsv(data: TimesheetWeekData): string {
+  const header = ["Employee", "Date", "Clock in", "Clock out", "Hours", "Cost", "Flags"];
+  const rows: string[] = [header.join(",")];
+  for (const emp of data.employees) {
+    for (const e of emp.entries) {
+      const flags: string[] = [];
+      if (e.incomplete) flags.push("incomplete");
+      if (e.late) flags.push("late");
+      if (e.edited) flags.push("edited");
+      const cost =
+        e.incomplete || emp.hourlyRate === null
+          ? ""
+          : String(Math.round(e.hours * emp.hourlyRate * 100) / 100);
+      rows.push(
+        [
+          csvField(emp.name),
+          e.date,
+          e.clockInAt,
+          e.clockOutAt ?? "",
+          String(e.hours),
+          cost,
+          csvField(flags.join(" ")),
+        ].join(","),
+      );
+    }
+  }
+  return rows.join("\n") + "\n";
+}

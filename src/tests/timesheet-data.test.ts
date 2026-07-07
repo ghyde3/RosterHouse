@@ -2,7 +2,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "@/lib/db";
 import { createFixture, createShiftAt, destroyFixture, type Fixture } from "./helpers/factory";
-import { entryHours, getTimesheetWeekData, LATE_GRACE_MS } from "@/lib/timesheet-data";
+import { entryHours, getTimesheetWeekData, LATE_GRACE_MS, timesheetsToCsv } from "@/lib/timesheet-data";
 import { localToUtc, weekStartOf } from "@/lib/time";
 
 // A fixed Monday in the fixture timezone (America/New_York).
@@ -128,5 +128,86 @@ describe("getTimesheetWeekData", () => {
 
   it("exposes LATE_GRACE_MS as five minutes", () => {
     expect(LATE_GRACE_MS).toBe(5 * 60 * 1000);
+  });
+});
+
+describe("timesheetsToCsv", () => {
+  it("emits a header and one row per entry with quoted fields", () => {
+    const csv = timesheetsToCsv({
+      weekStart: "2026-07-06",
+      overtimeHoursPerWeek: 40,
+      employees: [
+        {
+          profileId: "p1",
+          name: "Ana, Diaz",
+          primaryPositionName: "Server",
+          hourlyRate: 20,
+          hoursActual: 8,
+          laborCost: 160,
+          lateCount: 0,
+          noShowCount: 0,
+          overtime: false,
+          entries: [
+            {
+              id: "e1",
+              date: "2026-07-06",
+              clockInAt: "2026-07-06T13:00:00.000Z",
+              clockOutAt: "2026-07-06T21:00:00.000Z",
+              hours: 8,
+              shiftId: "s1",
+              shiftLabel: "9:00 AM – 5:00 PM",
+              incomplete: false,
+              late: false,
+              edited: true,
+            },
+          ],
+        },
+      ],
+    });
+    const lines = csv.trim().split("\n");
+    expect(lines[0]).toBe("Employee,Date,Clock in,Clock out,Hours,Cost,Flags");
+    // Name has a comma → must be quoted.
+    expect(lines[1]).toContain('"Ana, Diaz"');
+    expect(lines[1]).toContain("2026-07-06");
+    expect(lines[1]).toContain("8");
+    expect(lines[1]).toContain("edited");
+  });
+
+  it("marks an incomplete entry and a no-rate cost blank", () => {
+    const csv = timesheetsToCsv({
+      weekStart: "2026-07-06",
+      overtimeHoursPerWeek: null,
+      employees: [
+        {
+          profileId: "p2",
+          name: "Ben Cho",
+          primaryPositionName: null,
+          hourlyRate: null,
+          hoursActual: 0,
+          laborCost: null,
+          lateCount: 0,
+          noShowCount: 0,
+          overtime: false,
+          entries: [
+            {
+              id: "e2",
+              date: "2026-07-06",
+              clockInAt: "2026-07-06T13:00:00.000Z",
+              clockOutAt: null,
+              hours: 0,
+              shiftId: null,
+              shiftLabel: null,
+              incomplete: true,
+              late: false,
+              edited: false,
+            },
+          ],
+        },
+      ],
+    });
+    const row = csv.trim().split("\n")[1];
+    expect(row).toContain("incomplete");
+    // Cost column blank (two commas around it): ...,,... with no number.
+    expect(row.split(",").includes("")).toBe(true);
   });
 });
