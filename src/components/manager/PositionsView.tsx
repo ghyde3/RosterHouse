@@ -34,7 +34,7 @@ export function PositionsView({ active, archived }: PositionsViewProps) {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [renameError, setRenameError] = useState<string | undefined>(undefined);
-  const [showArchived, setShowArchived] = useState(true);
+  const [showArchived, setShowArchived] = useState(false);
   const [busy, setBusy] = useState(false);
 
   async function run(fn: () => Promise<void>, failTitle: string) {

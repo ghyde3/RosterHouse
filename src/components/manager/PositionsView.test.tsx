@@ -45,6 +45,15 @@ describe("PositionsView", () => {
     expect(screen.getByText(/Archived \(1\)/)).toBeInTheDocument();
   });
 
+  it("collapses the archived section by default", () => {
+    render(<PositionsView active={active} archived={archived} />);
+    expect(screen.getByText(/Archived \(1\)/)).toHaveAttribute("aria-expanded", "false");
+    // Busser is only in the archived list, so it must not be rendered while collapsed.
+    expect(screen.queryByText("Busser")).toBeNull();
+    fireEvent.click(screen.getByText(/Archived \(1\)/));
+    expect(screen.getByText("Busser")).toBeInTheDocument();
+  });
+
   it("POSTs a new position name", async () => {
     render(<PositionsView active={active} archived={archived} />);
     fireEvent.change(screen.getByPlaceholderText("Add a position"), { target: { value: "Bartender" } });
@@ -95,6 +104,7 @@ describe("PositionsView", () => {
 
   it("unarchives via PATCH { archived: false }", async () => {
     render(<PositionsView active={active} archived={archived} />);
+    fireEvent.click(screen.getByText(/Archived \(1\)/)); // expand the collapsed-by-default section
     fireEvent.click(screen.getByText("Unarchive"));
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
     const [url, init] = fetchMock.mock.calls[0];
