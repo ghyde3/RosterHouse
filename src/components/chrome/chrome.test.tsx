@@ -12,12 +12,13 @@ vi.mock("next/navigation", () => ({
 }));
 
 describe("ManagerSidebar", () => {
-  it("renders all six nav items as real links", () => {
+  it("renders all seven nav items as real links, with Settings replacing Templates", () => {
     pathnameMock.mockReturnValue("/manager");
     render(<ManagerSidebar locationName="Downtown" userName="Jamie Park" />);
     const expected: Array<[string, string]> = [
       ["Dashboard", "/manager"],
       ["Schedule", "/manager/schedule"],
+      ["Settings", "/manager/settings"],
       ["Team", "/manager/team"],
       ["Availability", "/manager/availability"],
       ["Time off", "/manager/time-off"],
@@ -26,12 +27,13 @@ describe("ManagerSidebar", () => {
     for (const [name, href] of expected) {
       expect(screen.getByRole("link", { name })).toHaveAttribute("href", href);
     }
+    expect(screen.queryByRole("link", { name: "Templates" })).not.toBeInTheDocument();
   });
 
-  it("marks the current section with aria-current", () => {
-    pathnameMock.mockReturnValue("/manager/schedule");
+  it("keeps Settings active on a settings sub-route (e.g. templates)", () => {
+    pathnameMock.mockReturnValue("/manager/settings/templates");
     render(<ManagerSidebar locationName="Downtown" userName="Jamie Park" />);
-    expect(screen.getByRole("link", { name: "Schedule" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute(
       "aria-current",
       "page"
     );

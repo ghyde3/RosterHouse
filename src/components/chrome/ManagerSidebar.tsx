@@ -15,7 +15,7 @@ const NAV: Array<{
 }> = [
   { href: "/manager", label: "Dashboard", icon: "layout-dashboard", exact: true },
   { href: "/manager/schedule", label: "Schedule", icon: "calendar" },
-  { href: "/manager/templates", label: "Templates", icon: "calendar-days" },
+  { href: "/manager/settings", label: "Settings", icon: "settings" },
   { href: "/manager/team", label: "Team", icon: "users" },
   { href: "/manager/availability", label: "Availability", icon: "calendar-check" },
   { href: "/manager/time-off", label: "Time off", icon: "clock" },
