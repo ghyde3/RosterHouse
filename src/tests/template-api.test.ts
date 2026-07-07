@@ -15,6 +15,14 @@ import {
 } from "@/app/api/schedule-templates/[templateId]/route";
 import { createFixture, createShiftAt, destroyFixture, type Fixture } from "./helpers/factory";
 import { localToUtc, weekStartOf } from "@/lib/time";
+import { POST as previewRoute } from "@/app/api/schedule-templates/[templateId]/preview/route";
+import { POST as applyRoute } from "@/app/api/schedule-templates/[templateId]/apply/route";
+import { prisma } from "@/lib/db";
+import { addDaysISO } from "@/lib/time";
+
+function bodyRequest(body: unknown): Request {
+  return new Request("http://test", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+}
 
 let f: Fixture;
 
@@ -127,5 +135,50 @@ describe("GET/PATCH/DELETE /api/schedule-templates/[templateId]", () => {
       mockSession.current = savedSession;
       await destroyFixture(other);
     }
+  });
+});
+
+describe("preview + apply endpoints", () => {
+  it("previews then applies a template as draft shifts", async () => {
+    const createRes = await createTemplateRoute(
+      jsonRequest("POST", {
+        name: "Preview apply api",
+        rows: [
+          { positionId: f.positionIds.server, employeeProfileId: f.ana.profileId, dayOfWeek: 2, startTime: "9:00 AM", endTime: "5:00 PM" },
+        ],
+      }),
+    );
+    const templateId = (await createRes.json()).data.template.id;
+    const targetWeek = addDaysISO(weekStartOf(new Date(), f.timezone), 28); // isolate
+
+    const previewRes = await previewRoute(bodyRequest({ targetWeek }), { params: Promise.resolve({ templateId }) });
+    const preview = (await previewRes.json()).data.preview;
+    expect(preview.targetWeek).toBe(targetWeek);
+    expect(preview.rows).toHaveLength(1);
+    const rowId = preview.rows[0].rowId;
+
+    const applyRes = await applyRoute(
+      bodyRequest({ targetWeek, mode: "replace", assignments: { [rowId]: f.ana.profileId } }),
+      { params: Promise.resolve({ templateId }) },
+    );
+    const result = (await applyRes.json()).data.result;
+    expect(result.created).toBe(1);
+
+    const schedule = await prisma.schedule.findFirstOrThrow({
+      where: { locationId: f.locationId, weekStartDate: new Date(targetWeek) },
+    });
+    const shifts = await prisma.shift.findMany({ where: { scheduleId: schedule.id } });
+    expect(shifts).toHaveLength(1);
+    expect(shifts[0].status).toBe("draft");
+    expect(shifts[0].employeeProfileId).toBe(f.ana.profileId);
+  });
+
+  it("404s preview/apply for an unknown template", async () => {
+    const p = await previewRoute(bodyRequest({ targetWeek: "2026-07-06" }), { params: Promise.resolve({ templateId: "nope" }) });
+    expect(p.status).toBe(404);
+    const a = await applyRoute(bodyRequest({ targetWeek: "2026-07-06", mode: "add", assignments: {} }), {
+      params: Promise.resolve({ templateId: "nope" }),
+    });
+    expect(a.status).toBe(404);
   });
 });
