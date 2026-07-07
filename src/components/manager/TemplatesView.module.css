@@ -1,0 +1,54 @@
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: var(--space-6);
+  font-family: var(--font-sans);
+}
+.title {
+  font-size: var(--text-h1-size);
+  font-weight: var(--text-h1-weight);
+  color: var(--text-primary);
+}
+.actions {
+  display: flex;
+  gap: 10px;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-4);
+}
+.card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 14px;
+}
+.name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.subtitle {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+.cardActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.editLink {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-link, var(--text-primary));
+  text-decoration: none;
+  padding: 6px 8px;
+}
+.editLink:hover {
+  text-decoration: underline;
+}
