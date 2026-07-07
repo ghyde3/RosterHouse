@@ -73,6 +73,18 @@ function rowCreateData(rows: TemplateRowInput[]) {
   }));
 }
 
+async function assertPositionsAtLocation(locationId: string, positionIds: string[]): Promise<void> {
+  const unique = [...new Set(positionIds)];
+  if (unique.length === 0) return;
+  const found = await prisma.position.findMany({
+    where: { locationId, id: { in: unique } },
+    select: { id: true },
+  });
+  if (found.length !== unique.length) {
+    throw new ApiError(404, "not_found", "That position doesn't exist at this location");
+  }
+}
+
 export async function listTemplates(locationId: string): Promise<TemplateSummary[]> {
   const templates = await prisma.scheduleTemplate.findMany({
     where: { locationId },
@@ -109,6 +121,7 @@ export async function createTemplate(
   name: string,
   rows: TemplateRowInput[],
 ): Promise<TemplateDetail> {
+  await assertPositionsAtLocation(locationId, rows.map((r) => r.positionId));
   const dup = await prisma.scheduleTemplate.findFirst({ where: { locationId, name } });
   if (dup) throw new ApiError(409, "name_taken", "A template with that name already exists");
   const created = await prisma.scheduleTemplate.create({
@@ -129,6 +142,9 @@ export async function updateTemplate(
       where: { locationId, name: patch.name, id: { not: templateId } },
     });
     if (dup) throw new ApiError(409, "name_taken", "A template with that name already exists");
+  }
+  if (patch.rows !== undefined) {
+    await assertPositionsAtLocation(locationId, patch.rows.map((r) => r.positionId));
   }
   await prisma.$transaction([
     ...(patch.rows !== undefined
@@ -270,6 +286,7 @@ export async function applyTemplate(
     include: { rows: true },
   });
   if (!template) return null;
+  await assertPositionsAtLocation(locationId, template.rows.map((r) => r.positionId));
   const targetWeek = weekStartOfISO(input.targetWeek);
   const schedule = await getOrCreateSchedule(locationId, targetWeek);
 

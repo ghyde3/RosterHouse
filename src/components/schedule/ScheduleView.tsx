@@ -166,7 +166,11 @@ export default function ScheduleView({
           </div>
         </div>
         <div className={styles.actions}>
-          <Button variant="secondary" onClick={() => setSaveOpen(true)}>
+          <Button
+            variant="secondary"
+            disabled={data.shifts.length === 0}
+            onClick={() => setSaveOpen(true)}
+          >
             Save as template
           </Button>
           <Button variant="secondary" onClick={() => setApplyOpen(true)}>

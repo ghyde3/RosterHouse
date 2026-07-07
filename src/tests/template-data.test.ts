@@ -317,3 +317,71 @@ describe("applyTemplate", () => {
     }
   });
 });
+
+describe("position tenancy", () => {
+  it("createTemplate rejects a row whose positionId belongs to another location", async () => {
+    const other = await createFixture();
+    try {
+      await expect(
+        createTemplate(f.locationId, "Foreign position create", [
+          {
+            positionId: other.positionIds.server,
+            employeeProfileId: null,
+            dayOfWeek: 0,
+            startTime: "9:00 AM",
+            endTime: "5:00 PM",
+          },
+        ]),
+      ).rejects.toMatchObject({ status: 404 });
+    } finally {
+      await destroyFixture(other);
+    }
+  });
+
+  it("updateTemplate rejects a row whose positionId belongs to another location", async () => {
+    const other = await createFixture();
+    try {
+      const created = await createTemplate(f.locationId, "Foreign position update", [
+        { positionId: f.positionIds.server, employeeProfileId: null, dayOfWeek: 0, startTime: "9:00 AM", endTime: "5:00 PM" },
+      ]);
+      await expect(
+        updateTemplate(f.locationId, created.id, {
+          rows: [
+            {
+              positionId: other.positionIds.dishwasher,
+              employeeProfileId: null,
+              dayOfWeek: 1,
+              startTime: "10:00 AM",
+              endTime: "6:00 PM",
+            },
+          ],
+        }),
+      ).rejects.toMatchObject({ status: 404 });
+    } finally {
+      await destroyFixture(other);
+    }
+  });
+
+  it("applyTemplate rejects a pre-existing row with a foreign positionId", async () => {
+    const other = await createFixture();
+    try {
+      const template = await createTemplate(f.locationId, "Foreign position apply", [
+        { positionId: f.positionIds.server, employeeProfileId: null, dayOfWeek: 0, startTime: "9:00 AM", endTime: "5:00 PM" },
+      ]);
+      const detail = (await getTemplateDetail(f.locationId, template.id))!;
+      // Mirrors the foreign-employeeProfileId swap in the resolveTemplateForWeek
+      // test: bypass create's guard to simulate a pre-existing bad row.
+      await prisma.scheduleTemplateRow.update({
+        where: { id: detail.rows[0].id },
+        data: { positionId: other.positionIds.server },
+      });
+
+      const targetWeek = addDaysISO(weekStartOf(new Date(), f.timezone), 28);
+      await expect(
+        applyTemplate(f.locationId, template.id, { targetWeek, mode: "add", assignments: {} }, f.timezone),
+      ).rejects.toMatchObject({ status: 404 });
+    } finally {
+      await destroyFixture(other);
+    }
+  });
+});
