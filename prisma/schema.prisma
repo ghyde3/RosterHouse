@@ -315,6 +315,8 @@ model TimeClockEntry {
   clockOutLat       Decimal?
   clockOutLng       Decimal?
   createdAt         DateTime  @default(now())
+  editedByUserId    String?   // manager who last corrected this entry (audit)
+  editedAt          DateTime? // when it was corrected
 
   employeeProfile EmployeeProfile @relation(fields: [employeeProfileId], references: [id], onDelete: Cascade)
   shift           Shift?          @relation(fields: [shiftId], references: [id])
