@@ -63,6 +63,8 @@ describe("GET /api/me", () => {
       notifyPush: true,
       notifySms: true,
       notifyEmail: false,
+      vacationBalanceHours: null,
+      sickBalanceHours: null,
     });
   });
 

@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { z } from "zod";
 import { handleApiError, jsonErr, jsonOk, parseJson } from "@/lib/api";
+import { logAudit } from "@/lib/audit";
 import { apiUser } from "@/lib/auth";
 import { assertLocationMember } from "@/lib/authz";
 import { prisma } from "@/lib/db";
@@ -51,6 +52,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ locatio
         token: randomUUID(),
         expiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
       },
+    });
+
+    await logAudit({
+      organizationId: location.organizationId,
+      locationId,
+      actorUserId: user.id,
+      actorName: user.name,
+      action: "team.invited",
+      entityType: "Invite",
+      entityId: invite.id,
+      detail: { name, position: position.name },
     });
 
     // v1 delivery: the manager copies this link into a text or email.

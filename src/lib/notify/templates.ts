@@ -12,6 +12,8 @@ const DEEP_LINK_PATHS: Record<NotificationType, string> = {
   claim_approved: "/swaps",
   claim_denied: "/swaps",
   open_shift_posted: "/swaps",
+  drop_approved: "/shifts",
+  drop_denied: "/shifts",
 };
 
 export function deepLinkFor(type: NotificationType): string {

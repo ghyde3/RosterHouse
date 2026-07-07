@@ -32,6 +32,24 @@ describe("getLocationAvailability", () => {
         { employeeProfileId: maria.profileId, dayOfWeek: 1, isAvailable: false, startTime: null, endTime: null },
       ],
     });
+    // One-off exceptions: Sat (default all-day) blocked; Sun gets a window.
+    await prisma.availabilityException.createMany({
+      data: [
+        {
+          employeeProfileId: maria.profileId,
+          date: new Date("2026-07-11T00:00:00.000Z"),
+          isAvailable: false,
+          note: "Wedding",
+        },
+        {
+          employeeProfileId: maria.profileId,
+          date: new Date("2026-07-12T00:00:00.000Z"),
+          isAvailable: true,
+          startTime: "08:00",
+          endTime: "20:00",
+        },
+      ],
+    });
     // Approved time off Wed–Thu of the displayed week; a denied one is ignored.
     await prisma.timeOffRequest.createMany({
       data: [
@@ -71,14 +89,37 @@ describe("getLocationAvailability", () => {
       startTime: "09:00",
       endTime: "17:00",
       timeOff: false,
+      exception: false,
     });
     expect(mariaDays[1].isAvailable).toBe(false);
     expect(mariaDays[2].timeOff).toBe(true); // Wed
     expect(mariaDays[3].timeOff).toBe(true); // Thu
     expect(mariaDays[4].timeOff).toBe(false); // Fri — denied request ignored
 
+    // Sat: unavailable exception overrides the all-day default.
+    expect(mariaDays[5]).toEqual({
+      dayOfWeek: 5,
+      date: "2026-07-11",
+      isAvailable: false,
+      startTime: null,
+      endTime: null,
+      timeOff: false,
+      exception: true,
+    });
+    // Sun: custom-hours exception carries the effective window.
+    expect(mariaDays[6]).toEqual({
+      dayOfWeek: 6,
+      date: "2026-07-12",
+      isAvailable: true,
+      startTime: "08:00",
+      endTime: "20:00",
+      timeOff: false,
+      exception: true,
+    });
+
     const noruleDays = data.employees[1].days;
     expect(noruleDays.every((d) => d.isAvailable && d.startTime === null)).toBe(true);
+    expect(noruleDays.every((d) => !d.exception)).toBe(true);
   });
 
   it("exposes primaryPositionId and orders by primary sortOrder then name", async () => {

@@ -34,6 +34,8 @@ function renderForm() {
       name="Harbor & Vine"
       timezone="America/New_York"
       overtimeHoursPerWeek={40}
+      minRestHours={10}
+      maxConsecutiveDays={6}
       address="1 Dock St"
     />,
   );
@@ -107,6 +109,38 @@ describe("LocationSettingsForm", () => {
     const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
     expect(body.overtimeHoursPerWeek).toBeNull();
     expect(body.address).toBeNull();
+  });
+
+  it("prefills and PATCHes the compliance settings", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderForm();
+    expect(
+      (screen.getByLabelText("Minimum rest between shifts (hours)") as HTMLInputElement).value,
+    ).toBe("10");
+    expect((screen.getByLabelText("Max consecutive days") as HTMLInputElement).value).toBe("6");
+    fireEvent.change(screen.getByLabelText("Minimum rest between shifts (hours)"), {
+      target: { value: "12" },
+    });
+    fireEvent.change(screen.getByLabelText("Max consecutive days"), { target: { value: "5" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
+    expect(body.minRestHours).toBe(12);
+    expect(body.maxConsecutiveDays).toBe(5);
+  });
+
+  it("sends null for blank compliance settings (checks off)", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderForm();
+    fireEvent.change(screen.getByLabelText("Minimum rest between shifts (hours)"), {
+      target: { value: "" },
+    });
+    fireEvent.change(screen.getByLabelText("Max consecutive days"), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
+    expect(body.minRestHours).toBeNull();
+    expect(body.maxConsecutiveDays).toBeNull();
   });
 
   it("rejects an empty location name inline without calling the API", async () => {

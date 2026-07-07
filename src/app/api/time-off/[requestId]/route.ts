@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { jsonErr, jsonOk } from "@/lib/api";
+import { logAudit } from "@/lib/audit";
 import { sessionUser } from "@/lib/api-session";
 import { getManagerLocation } from "@/lib/authz";
 import { notifyUsers } from "@/lib/notify";
@@ -40,9 +41,41 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ requestId: st
       where: { id: requestId, status: "pending" },
       data: { status, decidedByUserId: user.id, decidedAt: new Date() },
     });
-    return updated.count === 1;
+    if (updated.count !== 1) return false;
+
+    // Approving vacation/sick time deducts (inclusive days × 8) hours from the
+    // matching balance bucket. NULL bucket = tracking off; balances may go negative.
+    if (decision === "approve" && (request.reason === "vacation" || request.reason === "sick")) {
+      const bucket = request.reason === "vacation" ? "vacationBalanceHours" : "sickBalanceHours";
+      if (request.employeeProfile[bucket] !== null) {
+        // @db.Date columns come back as UTC midnight, so the diff is exact.
+        const days =
+          Math.round((request.endDate.getTime() - request.startDate.getTime()) / 86_400_000) + 1;
+        await tx.employeeProfile.update({
+          where: { id: request.employeeProfileId },
+          data: { [bucket]: { decrement: days * 8 } },
+        });
+      }
+    }
+    return true;
   });
   if (!decided) return jsonErr("already_decided", "This request was already decided.", 409);
+
+  await logAudit({
+    organizationId: user.organizationId,
+    locationId: managerLocation.id,
+    actorUserId: user.id,
+    actorName: user.name,
+    action: decision === "approve" ? "timeoff.approved" : "timeoff.denied",
+    entityType: "TimeOffRequest",
+    entityId: request.id,
+    detail: {
+      employee: request.employeeProfile.user.name,
+      startDate: isoDateOf(request.startDate),
+      endDate: isoDateOf(request.endDate),
+      reason: request.reason,
+    },
+  });
 
   const rangeLabel = formatDateRange(isoDateOf(request.startDate), isoDateOf(request.endDate));
   if (decision === "approve") {

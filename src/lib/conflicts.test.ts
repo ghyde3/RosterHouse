@@ -114,6 +114,88 @@ describe("outside_availability", () => {
   });
 });
 
+describe("availability exceptions", () => {
+  it("an unavailable exception blocks a date the weekly rule allows", () => {
+    const c = ctx({
+      // Wednesday is allowed all day by the weekly rule…
+      availability: [{ dayOfWeek: 2, isAvailable: true, startTime: null, endTime: null }],
+      // …but a one-off exception blocks 2026-07-08 (a Wednesday).
+      availabilityExceptions: [
+        { date: "2026-07-08", isAvailable: false, startTime: null, endTime: null },
+      ],
+    });
+    expect(detectConflicts(proposed("2026-07-08", "9:00 AM", "5:00 PM"), c)).toEqual([
+      { kind: "outside_availability", message: "Maria Garcia isn't available on Jul 8" },
+    ]);
+  });
+
+  it("an available exception frees a date the weekly rule blocks", () => {
+    const c = ctx({
+      availability: [{ dayOfWeek: 0, isAvailable: false, startTime: null, endTime: null }],
+      availabilityExceptions: [
+        { date: "2026-07-06", isAvailable: true, startTime: null, endTime: null },
+      ],
+    });
+    // 2026-07-06 is a Monday — blocked weekly, freed by the exception.
+    expect(detectConflicts(proposed("2026-07-06", "9:00 AM", "5:00 PM"), c)).toEqual([]);
+  });
+
+  it("custom-hours exception: inside the window passes, outside flags with pinned copy", () => {
+    const c = ctx({
+      employeeName: "Sam Torres",
+      availabilityExceptions: [
+        { date: "2026-07-07", isAvailable: true, startTime: "12:00", endTime: "18:00" },
+      ],
+    });
+    expect(detectConflicts(proposed("2026-07-07", "12:00 PM", "6:00 PM"), c)).toEqual([]);
+    expect(detectConflicts(proposed("2026-07-07", "9:00 AM", "4:00 PM"), c)).toEqual([
+      {
+        kind: "outside_availability",
+        message: "Sam Torres is only available 12:00 PM – 6:00 PM on Jul 7",
+      },
+    ]);
+  });
+
+  it("a custom-hours exception replaces the weekly window entirely", () => {
+    // Weekly Tuesday window is 9–3; the exception widens 2026-07-07 to 8–8,
+    // so a 3:00–8:00 PM shift (outside the weekly window) is fine.
+    const c = ctx({
+      availability: [{ dayOfWeek: 1, isAvailable: true, startTime: "09:00", endTime: "15:00" }],
+      availabilityExceptions: [
+        { date: "2026-07-07", isAvailable: true, startTime: "08:00", endTime: "20:00" },
+      ],
+    });
+    expect(detectConflicts(proposed("2026-07-07", "3:00 PM", "8:00 PM"), c)).toEqual([]);
+  });
+
+  it("exceptions on other dates leave the weekly rule in force", () => {
+    const c = ctx({
+      availability: [{ dayOfWeek: 0, isAvailable: false, startTime: null, endTime: null }],
+      availabilityExceptions: [
+        { date: "2026-07-13", isAvailable: true, startTime: null, endTime: null },
+      ],
+    });
+    // Exception is for the following Monday; this Monday stays blocked.
+    expect(detectConflicts(proposed("2026-07-06", "9:00 AM", "5:00 PM"), c)).toEqual([
+      { kind: "outside_availability", message: "Maria Garcia isn't available Mondays" },
+    ]);
+  });
+
+  it("does not shadow approved time off — both stack", () => {
+    const c = ctx({
+      availabilityExceptions: [
+        { date: "2026-07-14", isAvailable: false, startTime: null, endTime: null },
+      ],
+      approvedTimeOff: [{ startDate: "2026-07-14", endDate: "2026-07-14" }],
+    });
+    const conflicts = detectConflicts(proposed("2026-07-14", "9:00 AM", "5:00 PM"), c);
+    expect(conflicts.map((x) => x.kind)).toEqual([
+      "outside_availability",
+      "outside_availability",
+    ]);
+  });
+});
+
 describe("approved time off", () => {
   it("renders as outside_availability with the date range", () => {
     const c = ctx({ approvedTimeOff: [{ startDate: "2026-07-14", endDate: "2026-07-16" }] });

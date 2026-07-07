@@ -1,16 +1,27 @@
 import { z } from "zod";
 import { handleApiError, jsonErr, jsonOk, parseJson } from "@/lib/api";
+import { logAudit } from "@/lib/audit";
 import { apiUser } from "@/lib/auth";
 import { assertLocationMember } from "@/lib/authz";
 import { prisma } from "@/lib/db";
 import { getTeam } from "@/lib/team";
 import { Prisma } from "@/generated/prisma/client";
 
+const balanceHours = z
+  .number()
+  .min(-10000, "That balance is out of range.")
+  .max(10000, "That balance is out of range.")
+  .nullable()
+  .optional();
+
 const patchSchema = z.object({
   primaryPositionId: z.string().nullable().optional(),
   positionIds: z.array(z.string()).optional(),
   hourlyRate: z.number().min(0, "Hourly rate can't be negative.").nullable().optional(),
   status: z.enum(["active", "inactive"]).optional(),
+  // NULL = balance tracking off for that bucket.
+  vacationBalanceHours: balanceHours,
+  sickBalanceHours: balanceHours,
 });
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -57,6 +68,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
           ...(input.primaryPositionId !== undefined ? { primaryPositionId: input.primaryPositionId } : {}),
           ...(input.hourlyRate !== undefined ? { hourlyRate: input.hourlyRate } : {}),
           ...(input.status !== undefined ? { status: input.status } : {}),
+          ...(input.vacationBalanceHours !== undefined ? { vacationBalanceHours: input.vacationBalanceHours } : {}),
+          ...(input.sickBalanceHours !== undefined ? { sickBalanceHours: input.sickBalanceHours } : {}),
         },
       });
       if (effectivePositions) {
@@ -76,6 +89,45 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
     const members = await getTeam(profile.locationId);
     const member = members.find((m) => m.id === id);
+
+    // Audit: changed field names, plus before → after for money/balance fields.
+    const fields = (
+      ["primaryPositionId", "positionIds", "hourlyRate", "status", "vacationBalanceHours", "sickBalanceHours"] as const
+    ).filter((f) => input[f] !== undefined);
+    const numberOrNull = (v: unknown) => (v === null || v === undefined ? null : Number(v));
+    await logAudit({
+      organizationId: user.organizationId,
+      locationId: profile.locationId,
+      actorUserId: user.id,
+      actorName: user.name,
+      action: "team.member_updated",
+      entityType: "EmployeeProfile",
+      entityId: id,
+      detail: {
+        memberName: member?.name ?? null,
+        fields,
+        ...(input.hourlyRate !== undefined
+          ? { hourlyRate: { before: numberOrNull(profile.hourlyRate), after: input.hourlyRate } }
+          : {}),
+        ...(input.vacationBalanceHours !== undefined
+          ? {
+              vacationBalanceHours: {
+                before: numberOrNull(profile.vacationBalanceHours),
+                after: input.vacationBalanceHours,
+              },
+            }
+          : {}),
+        ...(input.sickBalanceHours !== undefined
+          ? {
+              sickBalanceHours: {
+                before: numberOrNull(profile.sickBalanceHours),
+                after: input.sickBalanceHours,
+              },
+            }
+          : {}),
+      },
+    });
+
     return jsonOk({ member });
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {

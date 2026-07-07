@@ -14,6 +14,8 @@ export default async function SettingsLocationPage() {
       name={location.name}
       timezone={location.timezone}
       overtimeHoursPerWeek={location.overtimeHoursPerWeek}
+      minRestHours={location.minRestHours}
+      maxConsecutiveDays={location.maxConsecutiveDays}
       address={location.address}
     />
   );

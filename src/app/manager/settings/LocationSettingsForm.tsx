@@ -38,6 +38,8 @@ export type LocationSettingsFormProps = {
   name: string;
   timezone: string;
   overtimeHoursPerWeek: number | null;
+  minRestHours: number | null;
+  maxConsecutiveDays: number | null;
   address: string | null;
 };
 
@@ -46,6 +48,8 @@ export function LocationSettingsForm({
   name: initialName,
   timezone: initialTimezone,
   overtimeHoursPerWeek: initialOvertime,
+  minRestHours: initialMinRest,
+  maxConsecutiveDays: initialMaxDays,
   address: initialAddress,
 }: LocationSettingsFormProps) {
   const router = useRouter();
@@ -55,6 +59,10 @@ export function LocationSettingsForm({
   const [timezone, setTimezone] = useState(initialTimezone);
   const [overtime, setOvertime] = useState(initialOvertime === null ? "" : String(initialOvertime));
   const [overtimeError, setOvertimeError] = useState<string | undefined>(undefined);
+  const [minRest, setMinRest] = useState(initialMinRest === null ? "" : String(initialMinRest));
+  const [minRestError, setMinRestError] = useState<string | undefined>(undefined);
+  const [maxDays, setMaxDays] = useState(initialMaxDays === null ? "" : String(initialMaxDays));
+  const [maxDaysError, setMaxDaysError] = useState<string | undefined>(undefined);
   const [address, setAddress] = useState(initialAddress ?? "");
   const [saving, setSaving] = useState(false);
 
@@ -79,6 +87,20 @@ export function LocationSettingsForm({
     }
     setOvertimeError(undefined);
 
+    const parsedMinRest = parseOvertimeInput(minRest.trim());
+    if (parsedMinRest === "invalid") {
+      setMinRestError("Enter a number, like 10");
+      return;
+    }
+    setMinRestError(undefined);
+
+    const parsedMaxDays = parseOvertimeInput(maxDays.trim());
+    if (parsedMaxDays === "invalid") {
+      setMaxDaysError("Enter a number, like 6");
+      return;
+    }
+    setMaxDaysError(undefined);
+
     if (timezone !== initialTimezone) {
       const ok = window.confirm(
         "Changing the time zone changes how all existing times display. Save anyway?",
@@ -95,6 +117,8 @@ export function LocationSettingsForm({
           name: trimmedName,
           timezone,
           overtimeHoursPerWeek: parsedOvertime,
+          minRestHours: parsedMinRest,
+          maxConsecutiveDays: parsedMaxDays,
           address: trimmedAddress === "" ? null : trimmedAddress,
         }),
       });
@@ -135,6 +159,26 @@ export function LocationSettingsForm({
         value={overtime}
         error={overtimeError}
         onChange={(e) => setOvertime(e.target.value)}
+      />
+      <Input
+        label="Minimum rest between shifts (hours)"
+        type="number"
+        min={1}
+        max={24}
+        placeholder="Leave blank to turn off rest conflicts"
+        value={minRest}
+        error={minRestError}
+        onChange={(e) => setMinRest(e.target.value)}
+      />
+      <Input
+        label="Max consecutive days"
+        type="number"
+        min={1}
+        max={14}
+        placeholder="Leave blank to turn off consecutive-day conflicts"
+        value={maxDays}
+        error={maxDaysError}
+        onChange={(e) => setMaxDays(e.target.value)}
       />
       <Input
         label="Address"

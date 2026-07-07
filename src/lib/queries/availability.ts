@@ -9,6 +9,7 @@ export type OverviewDay = {
   startTime: string | null; // "09:00" or null = all day
   endTime: string | null;
   timeOff: boolean; // approved time off covers this date
+  exception: boolean; // a one-off exception overrides the weekly rule this date
 };
 
 export type OverviewEmployee = {
@@ -37,6 +38,14 @@ export async function getLocationAvailability(
       user: true,
       primaryPosition: true,
       availability: true,
+      availabilityExceptions: {
+        where: {
+          date: {
+            gte: new Date(`${weekStart}T00:00:00.000Z`),
+            lte: new Date(`${weekEnd}T00:00:00.000Z`),
+          },
+        },
+      },
       timeOffRequests: {
         where: {
           status: "approved",
@@ -50,8 +59,14 @@ export async function getLocationAvailability(
 
   const employees = profiles.map((p) => {
     const byDay = new Map(p.availability.map((r) => [r.dayOfWeek, r]));
+    const exceptionByDate = new Map(
+      p.availabilityExceptions.map((e) => [e.date.toISOString().slice(0, 10), e])
+    );
     const days = dates.map((date, dayOfWeek) => {
       const rule = byDay.get(dayOfWeek);
+      // A one-off exception wins over the weekly rule for its date; the cell
+      // carries the effective values plus a flag so the view can mark it.
+      const exception = exceptionByDate.get(date);
       const timeOff = p.timeOffRequests.some(
         (req) =>
           req.startDate.toISOString().slice(0, 10) <= date &&
@@ -60,10 +75,11 @@ export async function getLocationAvailability(
       return {
         dayOfWeek,
         date,
-        isAvailable: rule ? rule.isAvailable : true,
-        startTime: rule?.startTime ?? null,
-        endTime: rule?.endTime ?? null,
+        isAvailable: exception ? exception.isAvailable : rule ? rule.isAvailable : true,
+        startTime: exception ? exception.startTime : (rule?.startTime ?? null),
+        endTime: exception ? exception.endTime : (rule?.endTime ?? null),
         timeOff,
+        exception: exception !== undefined,
       };
     });
     return {

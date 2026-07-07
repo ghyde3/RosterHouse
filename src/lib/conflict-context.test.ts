@@ -10,6 +10,7 @@ let timezone: string;
 let farWeek: ISODate; // 3 weeks out — no seed data there, so this test owns it
 let createdShiftId: string | null = null;
 let createdTimeOffId: string | null = null;
+let createdExceptionId: string | null = null;
 
 beforeAll(async () => {
   const maria = await prisma.user.findUnique({ where: { email: "maria@harborvine.test" } });
@@ -27,6 +28,9 @@ beforeAll(async () => {
 afterAll(async () => {
   if (createdShiftId) await prisma.shift.delete({ where: { id: createdShiftId } });
   if (createdTimeOffId) await prisma.timeOffRequest.delete({ where: { id: createdTimeOffId } });
+  if (createdExceptionId) {
+    await prisma.availabilityException.delete({ where: { id: createdExceptionId } });
+  }
   await prisma.schedule.deleteMany({
     where: { locationId, weekStartDate: new Date(farWeek) },
   });
@@ -92,5 +96,32 @@ describe("buildConflictContext", () => {
       startDate: addDaysISO(farWeek, 4),
       endDate: addDaysISO(farWeek, 5),
     });
+  });
+
+  it("loads availability exceptions scoped to the requested week", async () => {
+    const excDate = addDaysISO(farWeek, 3);
+    const exception = await prisma.availabilityException.create({
+      data: {
+        employeeProfileId: mariaProfileId,
+        date: new Date(excDate),
+        isAvailable: true,
+        startTime: "12:00",
+        endTime: "18:00",
+      },
+    });
+    createdExceptionId = exception.id;
+
+    const farCtx = await buildConflictContext(mariaProfileId, farWeek);
+    expect(farCtx.availabilityExceptions).toContainEqual({
+      date: excDate,
+      isAvailable: true,
+      startTime: "12:00",
+      endTime: "18:00",
+    });
+
+    const currentCtx = await buildConflictContext(mariaProfileId, weekStartOf(new Date(), timezone));
+    expect(currentCtx.availabilityExceptions ?? []).not.toContainEqual(
+      expect.objectContaining({ date: excDate })
+    );
   });
 });

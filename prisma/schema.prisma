@@ -67,6 +67,8 @@ enum NotificationType {
   claim_approved
   claim_denied
   open_shift_posted
+  drop_approved
+  drop_denied
 }
 
 model Organization {
@@ -76,6 +78,27 @@ model Organization {
   locations Location[]
   users     User[]
   invites   Invite[]
+  auditLogs AuditLog[]
+}
+
+// Org-level activity trail: who published, who edited a punch, who changed a
+// rate. Append-only; rows survive actor/location deletion for accountability.
+model AuditLog {
+  id             String   @id @default(cuid())
+  organizationId String
+  locationId     String?
+  actorUserId    String?
+  actorName      String // denormalized so entries outlive the actor's account
+  action         String // dotted verb, e.g. "schedule.published", "timeclock.edited"
+  entityType     String? // e.g. "Schedule", "Shift", "TimeClockEntry"
+  entityId       String?
+  detail         Json? // small structured context ({ weekStartDate, before, after, ... })
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@index([locationId, createdAt])
 }
 
 model Location {
@@ -90,6 +113,9 @@ model Location {
   geofenceRadiusM Int?
   // Weekly overtime threshold for conflict detection; NULL disables OT conflicts
   overtimeHoursPerWeek Int?     @default(40)
+  // Compliance guardrails, derived at read time like other conflicts; NULL disables each
+  minRestHours       Int? // minimum hours between a shift's end and the next shift's start ("clopening")
+  maxConsecutiveDays Int? // most days in a row an employee may be scheduled
   createdAt            DateTime @default(now())
 
   organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -148,19 +174,27 @@ model EmployeeProfile {
   notifyPush        Boolean        @default(true)
   notifySms         Boolean        @default(true)
   notifyEmail       Boolean        @default(false)
+  // Tokenized iCal feed URL; NULL until first requested, regenerable
+  calendarToken String? @unique
+  // Time-off balances in hours; NULL = balance tracking off for that bucket.
+  // Managers edit these; approving a vacation/sick request deducts from them.
+  vacationBalanceHours Decimal?
+  sickBalanceHours     Decimal?
 
   user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   location        Location           @relation(fields: [locationId], references: [id], onDelete: Cascade)
   primaryPosition Position?          @relation("PrimaryPosition", fields: [primaryPositionId], references: [id])
-  positions       EmployeePosition[]
-  shifts          Shift[]
-  availability    AvailabilityRule[]
-  timeOffRequests TimeOffRequest[]
-  swapRequests    SwapRequest[]      @relation("SwapRequester")
-  swapsCovering   SwapRequest[]      @relation("SwapCoverer")
-  openShiftClaims OpenShiftClaim[]
-  clockEntries    TimeClockEntry[]
-  templateRows    ScheduleTemplateRow[]
+  positions              EmployeePosition[]
+  shifts                 Shift[]
+  availability           AvailabilityRule[]
+  availabilityExceptions AvailabilityException[]
+  timeOffRequests        TimeOffRequest[]
+  swapRequests           SwapRequest[]      @relation("SwapRequester")
+  swapsCovering          SwapRequest[]      @relation("SwapCoverer")
+  openShiftClaims        OpenShiftClaim[]
+  clockEntries           TimeClockEntry[]
+  templateRows           ScheduleTemplateRow[]
+  dropRequests           DropRequest[]
 
   @@unique([userId, locationId])
 }
@@ -253,6 +287,7 @@ model Shift {
   swapRequests    SwapRequest[]
   claims          OpenShiftClaim[]
   clockEntries    TimeClockEntry[]
+  dropRequests    DropRequest[]
 
   @@index([locationId, date])
   @@index([employeeProfileId, date])
@@ -272,6 +307,24 @@ model AvailabilityRule {
   employeeProfile EmployeeProfile @relation(fields: [employeeProfileId], references: [id], onDelete: Cascade)
 
   @@unique([employeeProfileId, dayOfWeek])
+}
+
+// One-off availability override for a single date ("can't work next Tuesday")
+// without burning a time-off request. Wins over the weekly rule for that date;
+// conflict status stays derived at read time.
+model AvailabilityException {
+  id                String   @id @default(cuid())
+  employeeProfileId String
+  date              DateTime @db.Date // location-local date, like Shift.date
+  isAvailable       Boolean
+  startTime         String? // "09:00" location-local; NULL = all day (matches AvailabilityRule)
+  endTime           String?
+  note              String?
+  createdAt         DateTime @default(now())
+
+  employeeProfile EmployeeProfile @relation(fields: [employeeProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeProfileId, date])
 }
 
 model TimeOffRequest {
@@ -303,6 +356,22 @@ model SwapRequest {
   shift     Shift           @relation(fields: [shiftId], references: [id], onDelete: Cascade)
   requester EmployeeProfile @relation("SwapRequester", fields: [requestingEmployeeProfileId], references: [id], onDelete: Cascade)
   coverer   EmployeeProfile? @relation("SwapCoverer", fields: [coveringEmployeeProfileId], references: [id])
+}
+
+// "Ask to drop this shift" — on approval the shift becomes an open shift
+// (employeeProfileId NULL) that qualified teammates can claim.
+model DropRequest {
+  id                          String        @id @default(cuid())
+  shiftId                     String
+  requestingEmployeeProfileId String
+  note                        String?
+  status                      RequestStatus @default(pending)
+  decidedByUserId             String?
+  decidedAt                   DateTime?
+  createdAt                   DateTime      @default(now())
+
+  shift     Shift           @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  requester EmployeeProfile @relation(fields: [requestingEmployeeProfileId], references: [id], onDelete: Cascade)
 }
 
 model OpenShiftClaim {

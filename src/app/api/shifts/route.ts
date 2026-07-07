@@ -1,9 +1,11 @@
 import { handleApiError, jsonErr, jsonOk } from "@/lib/api";
+import { logAudit } from "@/lib/audit";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { requireManagerForApi } from "@/lib/manager-guard";
 import { getOrCreateSchedule, toScheduleShift } from "@/lib/schedule-data";
 import { createShiftSchema } from "@/lib/shift-schemas";
-import { parseTime12h, shiftInstants, weekStartOfISO } from "@/lib/time";
+import { formatShiftRange, parseTime12h, shiftInstants, weekStartOfISO } from "@/lib/time";
 
 export async function POST(req: Request) {
   try {
@@ -65,6 +67,23 @@ export async function POST(req: Request) {
       },
       include: { position: true, employeeProfile: { include: { user: true } } },
     });
+    const session = await auth();
+    await logAudit({
+      organizationId: guard.location.organizationId,
+      locationId: guard.location.id,
+      actorUserId: guard.userId,
+      actorName: session?.user?.name ?? "Manager",
+      action: "shift.created",
+      entityType: "Shift",
+      entityId: created.id,
+      detail: {
+        date: input.date,
+        timeRange: formatShiftRange(startsAt, endsAt, guard.location.timezone),
+        position: created.position.name,
+        assignee: created.employeeProfile?.user.name ?? null,
+      },
+    });
+
     // Conflicts are returned for the UI to warn — creation is never blocked.
     return jsonOk({ shift: await toScheduleShift(created, guard.location.timezone) });
   } catch (err) {

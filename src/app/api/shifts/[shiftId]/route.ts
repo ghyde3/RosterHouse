@@ -1,11 +1,13 @@
 import { auth } from "@/lib/auth";
 import { handleApiError, jsonErr, jsonOk } from "@/lib/api";
+import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { requireManagerForApi } from "@/lib/manager-guard";
 import { getEmployeeContext, getEmployeeShiftDetail } from "@/lib/queries/employee";
 import { getOrCreateSchedule, toScheduleShift } from "@/lib/schedule-data";
 import { updateShiftSchema } from "@/lib/shift-schemas";
 import {
+  formatShiftRange,
   localTimeOfDay,
   parseTime12h,
   shiftInstants,
@@ -108,6 +110,43 @@ export async function PATCH(
       },
       include: { position: true, employeeProfile: { include: { user: true } } },
     });
+
+    // Audit only the scalar fields that actually changed, before → after.
+    const before: Record<string, string | null> = {};
+    const after: Record<string, string | null> = {};
+    if (toISODate(existing.date) !== toISODate(updated.date)) {
+      before.date = toISODate(existing.date);
+      after.date = toISODate(updated.date);
+    }
+    if (
+      existing.startsAt.getTime() !== updated.startsAt.getTime() ||
+      existing.endsAt.getTime() !== updated.endsAt.getTime()
+    ) {
+      before.timeRange = formatShiftRange(existing.startsAt, existing.endsAt, timezone);
+      after.timeRange = formatShiftRange(updated.startsAt, updated.endsAt, timezone);
+    }
+    if (existing.employeeProfileId !== updated.employeeProfileId) {
+      const previous = existing.employeeProfileId
+        ? await prisma.employeeProfile.findUnique({
+            where: { id: existing.employeeProfileId },
+            select: { user: { select: { name: true } } },
+          })
+        : null;
+      before.assignee = previous?.user.name ?? null;
+      after.assignee = updated.employeeProfile?.user.name ?? null;
+    }
+    const session = await auth();
+    await logAudit({
+      organizationId: guard.location.organizationId,
+      locationId: guard.location.id,
+      actorUserId: guard.userId,
+      actorName: session?.user?.name ?? "Manager",
+      action: "shift.updated",
+      entityType: "Shift",
+      entityId: updated.id,
+      detail: { date: toISODate(updated.date), before, after },
+    });
+
     return jsonOk({ shift: await toScheduleShift(updated, timezone) });
   } catch (err) {
     return handleApiError(err);
@@ -127,6 +166,22 @@ export async function DELETE(
     });
     if (!existing) return jsonErr("not_found", "That shift no longer exists", 404);
     await prisma.shift.delete({ where: { id: shiftId } });
+
+    const session = await auth();
+    await logAudit({
+      organizationId: guard.location.organizationId,
+      locationId: guard.location.id,
+      actorUserId: guard.userId,
+      actorName: session?.user?.name ?? "Manager",
+      action: "shift.deleted",
+      entityType: "Shift",
+      entityId: shiftId,
+      detail: {
+        date: toISODate(existing.date),
+        timeRange: formatShiftRange(existing.startsAt, existing.endsAt, guard.location.timezone),
+      },
+    });
+
     return jsonOk({ deleted: true });
   } catch (err) {
     return handleApiError(err);

@@ -9,6 +9,7 @@ const LINKS: Array<{ href: string; label: string; exact?: boolean }> = [
   { href: "/manager/settings", label: "Location", exact: true },
   { href: "/manager/settings/positions", label: "Positions" },
   { href: "/manager/settings/templates", label: "Templates" },
+  { href: "/manager/settings/activity", label: "Activity" },
 ];
 
 export function SettingsSubnav() {

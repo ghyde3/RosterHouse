@@ -172,6 +172,49 @@ describe("PATCH /api/employee-profiles/[id]", () => {
     expect(res.status).toBe(404);
   });
 
+  it("sets vacation and sick balances", async () => {
+    asManager();
+    const res = await patchProfile(
+      jsonPatch(`http://test.local/api/employee-profiles/${profileId}`, {
+        vacationBalanceHours: 40,
+        sickBalanceHours: 16.5,
+      }),
+      params({ id: profileId }),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data.member.vacationBalanceHours).toBe(40);
+    expect(body.data.member.sickBalanceHours).toBe(16.5);
+  });
+
+  it("clears a balance back to null (tracking off) and leaves omitted buckets alone", async () => {
+    asManager();
+    const res = await patchProfile(
+      jsonPatch(`http://test.local/api/employee-profiles/${profileId}`, { vacationBalanceHours: null }),
+      params({ id: profileId }),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data.member.vacationBalanceHours).toBeNull();
+    expect(body.data.member.sickBalanceHours).toBe(16.5); // untouched
+  });
+
+  it("allows a negative balance but rejects one below the sanity bound", async () => {
+    asManager();
+    const ok = await patchProfile(
+      jsonPatch(`http://test.local/api/employee-profiles/${profileId}`, { sickBalanceHours: -8 }),
+      params({ id: profileId }),
+    );
+    expect(ok.status).toBe(200);
+    expect((await ok.json()).data.member.sickBalanceHours).toBe(-8);
+
+    const bad = await patchProfile(
+      jsonPatch(`http://test.local/api/employee-profiles/${profileId}`, { vacationBalanceHours: -10001 }),
+      params({ id: profileId }),
+    );
+    expect(bad.status).toBe(400);
+  });
+
   it("403s when a manager from another org attempts to patch", async () => {
     apiUserMock.mockResolvedValue({ id: managerId2, name: "Manager 2", role: "manager", organizationId: orgId2 });
     const res = await patchProfile(

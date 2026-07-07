@@ -1,4 +1,6 @@
 import { handleApiError, jsonErr, jsonOk } from "@/lib/api";
+import { logAudit } from "@/lib/audit";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { requireManagerForApi } from "@/lib/manager-guard";
 import { assertNameAvailable, nextSortOrder } from "@/lib/position-data";
@@ -30,6 +32,19 @@ export async function POST(req: Request) {
       },
       select: { id: true, name: true, sortOrder: true, archivedAt: true },
     });
+
+    const session = await auth();
+    await logAudit({
+      organizationId: guard.location.organizationId,
+      locationId: guard.location.id,
+      actorUserId: guard.userId,
+      actorName: session?.user?.name ?? "Manager",
+      action: "position.created",
+      entityType: "Position",
+      entityId: position.id,
+      detail: { name: position.name },
+    });
+
     return jsonOk({ position }, 201);
   } catch (err) {
     return handleApiError(err);

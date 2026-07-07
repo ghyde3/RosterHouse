@@ -15,7 +15,14 @@ import { PATCH as patchLocation } from "@/app/api/locations/[locationId]/route";
 import { createFixture, destroyFixture, type Fixture } from "./helpers/factory";
 
 let locationId: string;
-let original: { name: string; timezone: string; overtimeHoursPerWeek: number | null; address: string | null };
+let original: {
+  name: string;
+  timezone: string;
+  overtimeHoursPerWeek: number | null;
+  minRestHours: number | null;
+  maxConsecutiveDays: number | null;
+  address: string | null;
+};
 
 function jsonRequest(url: string, body: unknown): Request {
   return new Request(url, {
@@ -39,6 +46,8 @@ beforeAll(async () => {
     name: location.name,
     timezone: location.timezone,
     overtimeHoursPerWeek: location.overtimeHoursPerWeek,
+    minRestHours: location.minRestHours,
+    maxConsecutiveDays: location.maxConsecutiveDays,
     address: location.address,
   };
 });
@@ -130,6 +139,100 @@ describe("PATCH /api/locations/[locationId]", () => {
       { params: Promise.resolve({ locationId }) },
     );
     expect(res.status).toBe(400);
+  });
+
+  it("updates minRestHours and maxConsecutiveDays", async () => {
+    const res = await patchLocation(
+      jsonRequest(`http://test/api/locations/${locationId}`, {
+        name: original.name,
+        timezone: "America/New_York",
+        overtimeHoursPerWeek: 40,
+        minRestHours: 10,
+        maxConsecutiveDays: 6,
+        address: null,
+      }),
+      { params: Promise.resolve({ locationId }) },
+    );
+    const body = await res.json();
+    expect(res.status).toBe(200);
+    expect(body.data.location).toMatchObject({ minRestHours: 10, maxConsecutiveDays: 6 });
+    const row = await prisma.location.findUniqueOrThrow({ where: { id: locationId } });
+    expect(row.minRestHours).toBe(10);
+    expect(row.maxConsecutiveDays).toBe(6);
+  });
+
+  it("leaves the compliance settings unchanged when omitted from the body", async () => {
+    await prisma.location.update({
+      where: { id: locationId },
+      data: { minRestHours: 8, maxConsecutiveDays: 5 },
+    });
+    const res = await patchLocation(
+      jsonRequest(`http://test/api/locations/${locationId}`, {
+        name: original.name,
+        timezone: "America/New_York",
+        overtimeHoursPerWeek: 40,
+        address: null,
+      }),
+      { params: Promise.resolve({ locationId }) },
+    );
+    expect(res.status).toBe(200);
+    const row = await prisma.location.findUniqueOrThrow({ where: { id: locationId } });
+    expect(row.minRestHours).toBe(8);
+    expect(row.maxConsecutiveDays).toBe(5);
+  });
+
+  it("accepts null compliance settings (checks off)", async () => {
+    const res = await patchLocation(
+      jsonRequest(`http://test/api/locations/${locationId}`, {
+        name: original.name,
+        timezone: "America/New_York",
+        overtimeHoursPerWeek: 40,
+        minRestHours: null,
+        maxConsecutiveDays: null,
+        address: null,
+      }),
+      { params: Promise.resolve({ locationId }) },
+    );
+    const body = await res.json();
+    expect(res.status).toBe(200);
+    expect(body.data.location.minRestHours).toBeNull();
+    expect(body.data.location.maxConsecutiveDays).toBeNull();
+  });
+
+  it("rejects out-of-bounds or fractional minRestHours with 400", async () => {
+    for (const minRestHours of [0, 25, 7.5]) {
+      const res = await patchLocation(
+        jsonRequest(`http://test/api/locations/${locationId}`, {
+          name: original.name,
+          timezone: "America/New_York",
+          overtimeHoursPerWeek: 40,
+          minRestHours,
+          address: null,
+        }),
+        { params: Promise.resolve({ locationId }) },
+      );
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error.message).toContain("Minimum rest");
+    }
+  });
+
+  it("rejects out-of-bounds maxConsecutiveDays with 400", async () => {
+    for (const maxConsecutiveDays of [0, 15]) {
+      const res = await patchLocation(
+        jsonRequest(`http://test/api/locations/${locationId}`, {
+          name: original.name,
+          timezone: "America/New_York",
+          overtimeHoursPerWeek: 40,
+          maxConsecutiveDays,
+          address: null,
+        }),
+        { params: Promise.resolve({ locationId }) },
+      );
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error.message).toContain("Max consecutive days");
+    }
   });
 
   it("401s when signed out", async () => {

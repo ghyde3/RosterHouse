@@ -24,7 +24,12 @@ export function ApprovalsQueue({ items }: { items: ApprovalItem[] }) {
   async function decide(item: ApprovalItem, decision: "approve" | "deny") {
     setBusyId(item.id);
     try {
-      const url = item.kind === "swap" ? `/api/swap-requests/${item.id}` : `/api/open-shift-claims/${item.id}`;
+      const url =
+        item.kind === "swap"
+          ? `/api/swap-requests/${item.id}`
+          : item.kind === "drop"
+            ? `/api/drop-requests/${item.id}`
+            : `/api/open-shift-claims/${item.id}`;
       const res = await fetch(url, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -64,8 +69,8 @@ export function ApprovalsQueue({ items }: { items: ApprovalItem[] }) {
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ fontWeight: 700, color: "var(--text-primary)" }}>{item.employeeName}</span>
-              <Badge tone={item.kind === "swap" ? "info" : "warning"}>
-                {item.kind === "swap" ? "Swap" : "Open shift"}
+              <Badge tone={item.kind === "swap" ? "info" : item.kind === "drop" ? "neutral" : "warning"}>
+                {item.kind === "swap" ? "Swap" : item.kind === "drop" ? "Drop" : "Open shift"}
               </Badge>
             </div>
             <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 2 }}>{item.detail}</div>

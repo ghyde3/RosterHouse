@@ -88,6 +88,14 @@
   color: var(--amber-800);
 }
 
+.exceptionTag {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.75;
+}
+
 .skeleton {
   background: var(--surface-sunken);
   border-radius: var(--radius-md);

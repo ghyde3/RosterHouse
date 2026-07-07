@@ -6,7 +6,7 @@ import type { MyRequestItem } from "@/lib/requests";
 
 export function MyRequestsList({ items }: { items: MyRequestItem[] }) {
   if (items.length === 0) {
-    return <EmptyState title="No requests yet" description="Swap requests and shift claims you send show up here." />;
+    return <EmptyState title="No requests yet" description="Swap, drop, and claim requests you send show up here." />;
   }
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>

@@ -21,7 +21,7 @@ export default async function ManagerSwapsPage() {
         Swaps &amp; open shifts
       </h1>
       <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: "0 0 18px" }}>
-        Approve shift swaps and claims before they take effect.
+        Approve shift swaps, drops, and claims before they take effect.
       </p>
       <ApprovalsQueue items={approvals} />
     </div>
