@@ -25,7 +25,7 @@ export default async function ManagerAvailabilityPage({
   const [data, positions] = await Promise.all([
     getLocationAvailability(location.id, weekStart),
     prisma.position.findMany({
-      where: { locationId: location.id },
+      where: { locationId: location.id, archivedAt: null },
       orderBy: { sortOrder: "asc" },
     }),
   ]);
