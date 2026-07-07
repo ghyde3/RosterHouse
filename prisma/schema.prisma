@@ -183,11 +183,12 @@ model Invite {
 }
 
 model Position {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   locationId String
   name       String
-  sortOrder  Int      @default(0) // week grid renders positions as fixed ordered rows
-  createdAt  DateTime @default(now())
+  sortOrder  Int       @default(0) // week grid renders positions as fixed ordered rows
+  createdAt  DateTime  @default(now())
+  archivedAt DateTime? // null = active; set = hidden from new scheduling
 
   location         Location           @relation(fields: [locationId], references: [id], onDelete: Cascade)
   shifts           Shift[]
