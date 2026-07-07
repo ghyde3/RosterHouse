@@ -80,4 +80,34 @@ describe("getLocationAvailability", () => {
     const noruleDays = data.employees[1].days;
     expect(noruleDays.every((d) => d.isAvailable && d.startTime === null)).toBe(true);
   });
+
+  it("exposes primaryPositionId and orders by primary sortOrder then name", async () => {
+    // Reassign primary positions so ordering is observable:
+    //  - Maria → Server (sortOrder 1)
+    //  - Norule → Line cook (sortOrder 0)  [default already, set explicitly]
+    // Sorted result must be: Norule (Line cook, 0), then Maria (Server, 1).
+    await prisma.employeeProfile.update({
+      where: { id: maria.profileId },
+      data: { primaryPositionId: t.positions.server },
+    });
+    const norule = await prisma.employeeProfile.findFirstOrThrow({
+      where: { locationId: t.locationId, user: { name: "Norule Test" } },
+    });
+    await prisma.employeeProfile.update({
+      where: { id: norule.id },
+      data: { primaryPositionId: t.positions.lineCook },
+    });
+
+    const data = await getLocationAvailability(t.locationId, WEEK);
+    expect(data.employees.map((e) => e.name)).toEqual(["Norule Test", "Maria Test"]);
+    expect(data.employees.map((e) => e.primaryPositionId)).toEqual([
+      t.positions.lineCook,
+      t.positions.server,
+    ]);
+    // primaryPositionName still exposed alongside the id.
+    expect(data.employees.map((e) => e.primaryPositionName)).toEqual([
+      "Line cook",
+      "Server",
+    ]);
+  });
 });

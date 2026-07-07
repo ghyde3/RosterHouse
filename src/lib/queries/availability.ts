@@ -14,6 +14,7 @@ export type OverviewDay = {
 export type OverviewEmployee = {
   profileId: string;
   name: string;
+  primaryPositionId: string | null;
   primaryPositionName: string | null;
   days: OverviewDay[];
 };
@@ -44,7 +45,7 @@ export async function getLocationAvailability(
         },
       },
     },
-    orderBy: { user: { name: "asc" } },
+    orderBy: [{ primaryPosition: { sortOrder: "asc" } }, { user: { name: "asc" } }],
   });
 
   const employees = profiles.map((p) => {
@@ -68,6 +69,7 @@ export async function getLocationAvailability(
     return {
       profileId: p.id,
       name: p.user.name,
+      primaryPositionId: p.primaryPositionId,
       primaryPositionName: p.primaryPosition?.name ?? null,
       days,
     };
