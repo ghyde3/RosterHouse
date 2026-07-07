@@ -1,0 +1,166 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.title {
+  font-size: var(--text-h1-size);
+  font-weight: var(--text-h1-weight);
+  color: var(--text-primary);
+  margin: 0 0 6px;
+}
+
+.subtitle {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.exportLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-decoration: none;
+  padding: 8px 12px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+}
+
+.exportLink:hover {
+  color: var(--text-primary);
+  background: var(--surface-sunken);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.empRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  padding: 0;
+}
+
+.empMain {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.empName {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.empRole {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.empStats {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.stat {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.statValue {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.punches {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.punchRow {
+  display: grid;
+  grid-template-columns: 110px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--surface-sunken);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+
+.punchTimes {
+  color: var(--text-primary);
+}
+
+.punchMeta {
+  color: var(--text-secondary);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.punchActions {
+  display: flex;
+  gap: 8px;
+}
+
+.addRow {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.dialogFields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.emptyPunch {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  padding: 8px 12px;
+}
