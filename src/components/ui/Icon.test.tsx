@@ -8,6 +8,11 @@ describe("Icon", () => {
     expect(container.querySelector("svg")).not.toBeNull();
   });
 
+  it("renders the settings gear glyph as an svg", () => {
+    const { container } = render(<Icon name="settings" />);
+    expect(container.querySelector("svg")).not.toBeNull();
+  });
+
   it("defaults to size 18 and stroke width 1.75", () => {
     const { container } = render(<Icon name="alert-triangle" />);
     const svg = container.querySelector("svg");
